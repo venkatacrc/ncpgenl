@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCP-GENL Domain 10 — Safety, Ethics &amp; Compliance</title>
+    <style>
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.45;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #b45309;
+            border-bottom: 2px solid #b45309;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #fff7ed;
+            padding: 10px;
+            border-left: 5px solid #b45309;
+            margin-top: 30px;
+        }
+        .verse-box {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fff;
+            page-break-inside: avoid;
+        }
+        .verse-title {
+            font-size: 1.05em;
+            margin-bottom: 6px;
+        }
+        .meta {
+            text-align: left;
+            color: #777;
+            font-style: italic;
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+        }
+        .body {
+            font-size: 0.95em;
+            line-height: 1.55;
+        }
+        .body p { margin: 0.55em 0; }
+        .body code {
+            background: #f4f4f5;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 0.92em;
+        }
+        .body pre {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.4;
+        }
+        .body pre code {
+            background: none;
+            padding: 0;
+        }
+        .chain {
+            background-color: #f9f9f9;
+            padding: 8px 10px;
+            border-left: 3px solid #27ae60;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .author-note { text-align: center; color: #777; font-style: italic; margin-bottom: 20px; }
+        .summary { background: #fffbeb; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95em; }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 24px 0 8px;
+            font-size: 0.95em;
+        }
+        .nav a { color: #b45309; text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+        @media print {
+            body { max-width: 100%; padding: 0; }
+            .verse-box { border: 1px solid #ccc; }
+            .nav { display: none; }
+        }
+
+    </style>
+</head>
+<body>
+    <h1>NCP-GENL — Domain 10</h1>
+    <p style="text-align: center;">Safety, Ethics &amp; Compliance · exam weight 5%</p>
+    <p class="author-note">10 forward-chained verses for recitation.</p>
+    <div class="summary">
+        Fairness metrics, bias mitigation, NeMo Guardrails, and defense-in-depth.
+    </div>
+    <div class="nav">
+        <a href="../index.html">← All domains</a>
+        <span></span>
+    </div>
+    <h2>The 10 Verses</h2>
+    <div class="verse-box" id="v-10.01">
+        <div class="verse-title"><strong>Verse 10.01</strong> — Responsible AI principles</div>
+        <div class="meta">Objective 10.1</div>
+        <div class="body">
+<p>NVIDIA's Trustworthy AI pillars (aligned with common frameworks): <strong>privacy,<br />
+safety/security, transparency, non-discrimination/fairness, accountability</strong>. Applied<br />
+across the whole lifecycle — data (PII removal, 3.09), training (bias-aware),<br />
+evaluation (fairness metrics, 10.03), deployment (guardrails), and monitoring (audit,<br />
+9.14). Responsible AI is a process, not a one-time check.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Principles must become deployment practice — how? (10.02)</div>
+    </div>
+
+    <div class="verse-box" id="v-10.02">
+        <div class="verse-title"><strong>Verse 10.02</strong> — Responsible AI in the deployment lifecycle</div>
+        <div class="meta">Objective 10.1</div>
+        <div class="body">
+<p>Operationalize responsible AI at deploy time: <strong>model cards</strong> (intended use, limits,<br />
+eval results), <strong>risk assessment</strong> and red-teaming before launch, <strong>human oversight</strong><br />
+for high-stakes decisions, documented data provenance, and <strong>guardrails</strong> enforcing<br />
+policy at runtime (10.09). Compliance mapping (GDPR/AI Act/sector rules) and an incident<br />
+process complete it. Ties transparency (9.14) to enforceable controls.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> A core obligation is fairness — how do we audit for bias? (10.03)</div>
+    </div>
+
+    <div class="verse-box" id="v-10.03">
+        <div class="verse-title"><strong>Verse 10.03</strong> — Bias &amp; fairness audit metrics</div>
+        <div class="meta">Objective 10.2</div>
+        <div class="body">
+<p>Audit outcomes across protected groups with <strong>group fairness</strong> metrics:<br />
+- <strong>Demographic parity</strong>: equal positive rate across groups.<br />
+- <strong>Equal opportunity</strong>: equal true-positive rate across groups.<br />
+- <strong>Equalized odds</strong>: equal TPR and FPR across groups.</p>
+<p>These can conflict (impossibility results) — choose per context. For generative LLMs,<br />
+also probe stereotype/toxicity disparities across demographic prompts. Measure before<br />
+and after mitigation.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Fairness metrics need protected-attribute data — where do biases originate? (10.04)</div>
+    </div>
+
+    <div class="verse-box" id="v-10.04">
+        <div class="verse-title"><strong>Verse 10.04</strong> — Sources of bias across the lifecycle</div>
+        <div class="meta">Objective 10.2</div>
+        <div class="body">
+<p>Bias enters at many stages: <strong>data</strong> (historical/representation/sampling bias, skewed<br />
+web corpora), <strong>labeling</strong> (annotator bias), <strong>algorithmic</strong> (objective amplifies<br />
+majority), <strong>evaluation</strong> (unrepresentative benchmarks), and <strong>deployment</strong> (feedback<br />
+loops, 9.10). Because it compounds, mitigation must span the lifecycle, not just a<br />
+post-hoc filter. Identifying the <em>source</em> dictates the <em>fix</em> (data vs training vs<br />
+guardrail).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Monitoring must watch these in production — how? (10.05)</div>
+    </div>
+
+    <div class="verse-box" id="v-10.05">
+        <div class="verse-title"><strong>Verse 10.05</strong> — Production safety monitoring</div>
+        <div class="meta">Objective 10.3</div>
+        <div class="body">
+<p>Continuously monitor safety signals: <strong>toxicity/harmful-content rates</strong>, guardrail<br />
+trigger rates, jailbreak attempts, PII leakage, refusal/over-refusal rates, and fairness<br />
+metrics by segment. Wire into the Domain 9 stack (Prometheus/Grafana) with alerts and<br />
+audit logging. Safety monitoring is distinct from performance monitoring and often<br />
+required for compliance.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> What tooling classifies content as unsafe at runtime? (10.06)</div>
+    </div>
+
+    <div class="verse-box" id="v-10.06">
+        <div class="verse-title"><strong>Verse 10.06</strong> — Content-safety classifiers</div>
+        <div class="meta">Objective 10.3</div>
+        <div class="body">
+<p>Dedicated <strong>safety classifier models</strong> score inputs/outputs for toxicity, harm<br />
+categories, and policy violations, feeding guardrail decisions. NVIDIA ships safety NIMs<br />
+— e.g. <strong>Llama Nemotron Safety / Aegis</strong> content-safety models and topic-control /<br />
+jailbreak-detection models — invoked as rails. Complements (doesn't replace) alignment:<br />
+a classifier catches what the model's training missed.</p>
+<blockquote>
+<p><strong>Stale-knowledge flag:</strong> safety-model names (Aegis, Nemotron Safety) and versions<br />
+change. VERIFY.</p>
+</blockquote>
+        </div>
+<div class="chain"><strong>Chain →</strong> Detection is half; how do we *reduce* bias, not just observe it? (10.07)</div>
+    </div>
+
+    <div class="verse-box" id="v-10.07">
+        <div class="verse-title"><strong>Verse 10.07</strong> — Bias mitigation techniques</div>
+        <div class="meta">Objective 10.4</div>
+        <div class="body">
+<p>Mitigate at the stage the bias enters (10.04):<br />
+- <strong>Pre-processing</strong>: rebalance/augment data, remove biased features, curate (3.04).<br />
+- <strong>In-processing</strong>: fairness-constrained training, adversarial debiasing, preference<br />
+  alignment (DPO) toward fair behavior.<br />
+- <strong>Post-processing</strong>: threshold adjustment per group, output filtering/guardrails.</p>
+<p>Always <strong>re-measure</strong> fairness after mitigation (10.03) and watch for accuracy/fairness<br />
+trade-offs. No single technique is sufficient.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> How do we detect bias systematically, not anecdotally? (10.08)</div>
+    </div>
+
+    <div class="verse-box" id="v-10.08">
+        <div class="verse-title"><strong>Verse 10.08</strong> — Bias detection &amp; red-teaming</div>
+        <div class="meta">Objective 10.4</div>
+        <div class="body">
+<p>Systematic detection: <strong>counterfactual/perturbation testing</strong> (swap demographic terms,<br />
+compare outputs), <strong>bias benchmarks</strong> (BBQ, StereoSet, ToxiGen, CrowS-Pairs),<br />
+disaggregated metrics by segment, and <strong>red-teaming</strong> (adversarial prompting to elicit<br />
+harmful/biased outputs, including automated red-teaming with an attacker LLM). Track<br />
+findings over time and gate releases. Detection feeds mitigation (10.07) and guardrails<br />
+(10.09).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Detection and mitigation reduce risk probabilistically — what enforces limits at runtime? (10.09)</div>
+    </div>
+
+    <div class="verse-box" id="v-10.09">
+        <div class="verse-title"><strong>Verse 10.09</strong> — NeMo Guardrails &amp; Colang rails</div>
+        <div class="meta">Objective 10.5</div>
+        <div class="body">
+<p><strong>NeMo Guardrails</strong> enforces policy at runtime via programmable <strong>rails</strong>, defined in<br />
+the <strong>Colang</strong> language:<br />
+- <strong>Input rails</strong>: block/flag malicious or off-topic prompts (jailbreak/injection, 2.25).<br />
+- <strong>Dialog rails</strong>: constrain conversation to allowed topics/flows.<br />
+- <strong>Retrieval rails</strong>: filter/verify retrieved context (RAG).<br />
+- <strong>Output rails</strong>: block unsafe/PII/hallucinated responses (fact-check/self-check,<br />
+  5.24).</p>
+<p>Rails run independently of the model's cooperation — the enforcement layer that<br />
+prompting alone (Domain 2) cannot guarantee.</p>
+<blockquote>
+<p><strong>Stale-knowledge flag:</strong> Colang 1.0 vs 2.0 syntax differs. VERIFY.</p>
+</blockquote>
+        </div>
+<div class="chain"><strong>Chain →</strong> How do rails and other layers combine into defense in depth? (10.10)</div>
+    </div>
+
+    <div class="verse-box" id="v-10.10">
+        <div class="verse-title"><strong>Verse 10.10</strong> — Defense in depth (guardrail layers)</div>
+        <div class="meta">Objective 10.5</div>
+        <div class="body">
+<p>No single control is sufficient; layer them:<br />
+1. <strong>Data</strong> — curation, PII removal (3.09).<br />
+2. <strong>Model</strong> — alignment/SFT/DPO, safety fine-tuning (Domain 5).<br />
+3. <strong>Prompt</strong> — system constraints, grounding, constrained decoding (Domain 2).<br />
+4. <strong>Rails</strong> — NeMo Guardrails input/dialog/retrieval/output + safety classifiers<br />
+   (10.06, 10.09).<br />
+5. <strong>Monitoring</strong> — safety metrics, audit, red-teaming, incident response (10.05, 10.08,<br />
+   9.14).</p>
+<p>Each layer catches what earlier ones miss. This closes the course: from architecture<br />
+(Domain 1) to responsible, monitored, guard-railed production.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Course complete — return to `00-plan/calendar.md` for the spaced-repetition sweep and mock-exam schedule.</div>
+    </div>
+
+    <div class="nav">
+        <a href="09-production-monitoring.html">← Previous domain</a>
+        <a href="../index.html">All domains</a>
+        <span></span>
+    </div>
+</body>
+</html>

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCP-GENL Domain 6 — Evaluation</title>
+    <style>
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.45;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #b45309;
+            border-bottom: 2px solid #b45309;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #fff7ed;
+            padding: 10px;
+            border-left: 5px solid #b45309;
+            margin-top: 30px;
+        }
+        .verse-box {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fff;
+            page-break-inside: avoid;
+        }
+        .verse-title {
+            font-size: 1.05em;
+            margin-bottom: 6px;
+        }
+        .meta {
+            text-align: left;
+            color: #777;
+            font-style: italic;
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+        }
+        .body {
+            font-size: 0.95em;
+            line-height: 1.55;
+        }
+        .body p { margin: 0.55em 0; }
+        .body code {
+            background: #f4f4f5;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 0.92em;
+        }
+        .body pre {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.4;
+        }
+        .body pre code {
+            background: none;
+            padding: 0;
+        }
+        .chain {
+            background-color: #f9f9f9;
+            padding: 8px 10px;
+            border-left: 3px solid #27ae60;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .author-note { text-align: center; color: #777; font-style: italic; margin-bottom: 20px; }
+        .summary { background: #fffbeb; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95em; }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 24px 0 8px;
+            font-size: 0.95em;
+        }
+        .nav a { color: #b45309; text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+        @media print {
+            body { max-width: 100%; padding: 0; }
+            .verse-box { border: 1px solid #ccc; }
+            .nav { display: none; }
+        }
+
+    </style>
+</head>
+<body>
+    <h1>NCP-GENL — Domain 6</h1>
+    <p style="text-align: center;">Evaluation · exam weight 7%</p>
+    <p class="author-note">14 forward-chained verses for recitation.</p>
+    <div class="summary">
+        Perplexity, BLEU/ROUGE/METEOR, LLM-as-judge, Ragas, and continuous benchmarking.
+    </div>
+    <div class="nav">
+        <a href="../index.html">← All domains</a>
+        <a href="07-gpu-acceleration.html">Next domain →</a>
+    </div>
+    <h2>The 14 Verses</h2>
+    <div class="verse-box" id="v-6.01">
+        <div class="verse-title"><strong>Verse 6.01</strong> — Perplexity</div>
+        <div class="meta">Objective 6.1</div>
+        <div class="body">
+<p>Perplexity is the exponentiated average negative log-likelihood — the model's<br />
+"branching factor," how surprised it is per token:</p>
+<p>$$\text{PPL}=\exp!\left(-\frac{1}{N}\sum_{i=1}^{N}\log p(x_i\mid x_{&lt;i})\right)=\exp(\text{mean NLL})$$</p>
+<p>Lower = better. It is a <strong>fluency/likelihood</strong> measure computed on held-out text, <strong>not</strong><br />
+a task-quality measure (a fluent model can still be wrong). Only comparable across models<br />
+with the <strong>same tokenizer/vocabulary</strong> (tokenization changes N). Fixed-length models use<br />
+a sliding window.</p>
+<pre><code class="language-python">import torch
+ppl = torch.exp(torch.stack(nll_per_token).mean())
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Perplexity scores likelihood, not overlap with a reference — how do we score generated text against references? (6.02)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.02">
+        <div class="verse-title"><strong>Verse 6.02</strong> — BLEU (n-gram precision + brevity penalty)</div>
+        <div class="meta">Objective 6.1</div>
+        <div class="body">
+<p>BLEU is <strong>precision-oriented</strong>: what fraction of the candidate's n-grams appear in the<br />
+reference (with clipping to avoid repetition gaming), geometric mean over n=1..4, times<br />
+a <strong>brevity penalty</strong> that punishes too-short output:</p>
+<p>$$\text{BLEU}=BP\cdot\exp!\Big(\sum_{n=1}^{4}w_n\log p_n\Big),\quad<br />
+BP=\begin{cases}1 &amp; c&gt;r\ e^{(1-r/c)} &amp; c\le r\end{cases}$$</p>
+<p><code>c</code>=candidate length, <code>r</code>=reference length. No BP → a one-word correct token would score<br />
+perfectly. Standard for <strong>machine translation</strong>; corpus-level.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> BLEU measures precision — what if we care about recall (did we cover the reference)? (6.03)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.03">
+        <div class="verse-title"><strong>Verse 6.03</strong> — ROUGE (recall-oriented; ROUGE-N, ROUGE-L)</div>
+        <div class="meta">Objective 6.1</div>
+        <div class="body">
+<p>ROUGE is <strong>recall-oriented</strong>: how much of the reference is captured by the candidate.<br />
+- <strong>ROUGE-N</strong>: n-gram recall (ROUGE-1 unigrams, ROUGE-2 bigrams).<br />
+- <strong>ROUGE-L</strong>: based on the <strong>Longest Common Subsequence</strong> (order-aware, gaps allowed),<br />
+  combined into an F-measure:</p>
+<p>$$R=\frac{LCS(c,r)}{|r|},\quad P=\frac{LCS(c,r)}{|c|},\quad<br />
+F_{L}=\frac{(1+\beta^2)RP}{R+\beta^2 P}$$</p>
+<p>Standard for <strong>summarization</strong>. LCS needs no fixed n and rewards in-order coverage.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> BLEU/ROUGE only credit exact surface matches — how do we credit synonyms and stems? (6.04)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.04">
+        <div class="verse-title"><strong>Verse 6.04</strong> — METEOR (alignment, stems, synonyms)</div>
+        <div class="meta">Objective 6.1</div>
+        <div class="body">
+<p>METEOR aligns candidate↔reference words allowing <strong>exact, stem, and synonym</strong> matches<br />
+(WordNet), computes a <strong>recall-weighted F-mean</strong> (recall weighted ~9× precision), and<br />
+applies a <strong>fragmentation penalty</strong> for out-of-order chunks. Correlates better with<br />
+human judgment than BLEU at the sentence level because it credits meaning-preserving<br />
+variation. More expensive (needs stemmer/synonym resources, language-dependent).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> With three overlap metrics, how do I choose among them? (6.05)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.05">
+        <div class="verse-title"><strong>Verse 6.05</strong> — BLEU vs ROUGE vs METEOR decision</div>
+        <div class="meta">Objective 6.1</div>
+        <div class="body">
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Orientation</th>
+<th>Match type</th>
+<th>Standard use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BLEU</td>
+<td>precision + brevity penalty</td>
+<td>exact n-gram</td>
+<td>machine translation</td>
+</tr>
+<tr>
+<td>ROUGE</td>
+<td>recall (ROUGE-L = LCS)</td>
+<td>exact n-gram / subsequence</td>
+<td>summarization</td>
+</tr>
+<tr>
+<td>METEOR</td>
+<td>recall-weighted F-mean</td>
+<td>exact + stem + synonym</td>
+<td>sentence-level, human correlation</td>
+</tr>
+</tbody>
+</table>
+<p>All are surface-overlap metrics: they penalize valid paraphrases and can't judge<br />
+factuality. For semantic/quality assessment, escalate to embedding-based metrics<br />
+(BERTScore), <strong>LLM-as-a-judge</strong> (6.06), or humans (6.07).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Overlap metrics miss meaning — how do we score open-ended quality at scale? (6.06)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.06">
+        <div class="verse-title"><strong>Verse 6.06</strong> — LLM-as-a-judge</div>
+        <div class="meta">Objective 6.1</div>
+        <div class="body">
+<p>Use a strong LLM to score/compare outputs against a rubric (pointwise score or<br />
+<strong>pairwise</strong> preference). Scales far cheaper than humans and correlates reasonably for<br />
+open-ended quality. <strong>Known biases to control</strong>: position bias (favors first/second —<br />
+randomize order), verbosity bias (favors longer), self-preference (favors its own<br />
+family), and leniency. Mitigate with clear rubrics, reference answers, order swapping,<br />
+and calibration against human labels.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Judges still drift from ground truth — what&#x27;s the gold standard? (6.07)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.07">
+        <div class="verse-title"><strong>Verse 6.07</strong> — Human-in-the-loop evaluation</div>
+        <div class="meta">Objective 6.1</div>
+        <div class="body">
+<p>Human evaluation is the gold standard for quality/safety: pairwise preference,<br />
+Likert-scale ratings, or task success. Requires clear guidelines, multiple annotators,<br />
+and <strong>inter-annotator agreement</strong> (Cohen's/Fleiss' κ). Expensive and slow → used to<br />
+<strong>calibrate</strong> cheaper automatic metrics and LLM-judges, and for high-stakes final<br />
+sign-off. Combine quantitative metrics + human review (NVIDIA's recommended blend).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> For RAG systems specifically, which metrics apply? (6.08)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.08">
+        <div class="verse-title"><strong>Verse 6.08</strong> — Ragas metrics (RAG evaluation)</div>
+        <div class="meta">Objective 6.1</div>
+        <div class="body">
+<p><strong>Ragas</strong> evaluates RAG pipelines along component-specific axes, mostly via LLM-judged<br />
+scoring:<br />
+- <strong>Faithfulness</strong>: is the answer grounded in the retrieved context (no hallucination)?<br />
+- <strong>Answer relevancy</strong>: does the answer address the question?<br />
+- <strong>Context precision / recall</strong>: did retrieval return the right, sufficient chunks?</p>
+<p>Separating retrieval metrics from generation metrics localizes failures (bad retrieval<br />
+vs bad generation). NVIDIA integrates Ragas with NeMo/NIM endpoints (per the guide).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Metrics tell you *that* it failed — how do we find *why*? (6.09)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.09">
+        <div class="verse-title"><strong>Verse 6.09</strong> — Failure-mode taxonomy</div>
+        <div class="meta">Objective 6.2</div>
+        <div class="body">
+<p>Common LLM failure modes to name and detect: <strong>hallucination</strong> (fabricated facts),<br />
+<strong>repetition/degeneration</strong> (loops — decoding, 1.12), <strong>refusal/over-refusal</strong>,<br />
+<strong>instruction-ignoring</strong>, <strong>format violations</strong>, <strong>prompt-injection compliance</strong>,<br />
+<strong>reasoning errors</strong>, <strong>bias/toxicity</strong> (Domain 10), and <strong>context failures</strong> (ignoring<br />
+or misusing retrieved content). Classifying outputs into this taxonomy is the first<br />
+step of error analysis.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> With a taxonomy, how do we systematically analyze errors? (6.10)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.10">
+        <div class="verse-title"><strong>Verse 6.10</strong> — Systematic error analysis</div>
+        <div class="meta">Objective 6.2</div>
+        <div class="body">
+<p>Process: collect a representative failure sample → <strong>label</strong> each by failure mode<br />
+(6.09) → quantify frequencies → find patterns (input length, topic, language, retrieval<br />
+miss) → form hypotheses → target fixes (data, prompt, retrieval, fine-tuning) → re-test.<br />
+NVIDIA/DLI framing: <strong>start with error analysis</strong> before adding complexity — it tells<br />
+you which lever to pull. Track error rates over time as a monitoring signal (Domain 9).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Errors localized on one platform — do results hold across hardware/platforms? (6.11)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.11">
+        <div class="verse-title"><strong>Verse 6.11</strong> — Benchmarking across platforms</div>
+        <div class="meta">Objective 6.3</div>
+        <div class="body">
+<p>Compare deployments (on-prem <strong>DGX</strong> vs cloud GPUs, A100 vs H100, different serving<br />
+stacks) on both <strong>quality</strong> (task metrics — must be identical given same model/decoding)<br />
+and <strong>performance</strong> (latency percentiles, throughput/tokens-per-second, cost-per-token).<br />
+Quality should match across hardware; performance differs. Control everything but the<br />
+variable under test: same model version, prompts, decoding params, batch, warmup.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Fair performance comparison needs standardization — what exactly must be fixed? (6.12)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.12">
+        <div class="verse-title"><strong>Verse 6.12</strong> — Standardized metrics &amp; fair comparison</div>
+        <div class="meta">Objective 6.3</div>
+        <div class="body">
+<p>For reproducible, fair comparison: fix random <strong>seeds</strong>, <strong>decoding params</strong> (greedy for<br />
+determinism), prompt templates, dataset version, and tokenizer; report <strong>latency<br />
+percentiles</strong> (p50/p95/p99, not just mean), throughput at fixed concurrency, and confidence<br />
+intervals over multiple runs. Warm up before timing. Report the same metric definitions<br />
+across systems (e.g. TTFT vs end-to-end latency, 8.02). Standardized harnesses prevent<br />
+apples-to-oranges claims.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Ad-hoc scripts don&#x27;t scale — how do we build a reusable evaluation framework? (6.13)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.13">
+        <div class="verse-title"><strong>Verse 6.13</strong> — Evaluation framework design (NeMo Evaluator)</div>
+        <div class="meta">Objective 6.4</div>
+        <div class="body">
+<p>A robust framework integrates: dataset/benchmark management, multiple metric types<br />
+(overlap + embedding + LLM-judge + human), standardized configs, versioned results, and<br />
+regression tracking. <strong>NeMo Evaluator</strong> is NVIDIA's tool for running standardized LLM<br />
+evals (academic benchmarks, custom tasks, LLM-as-judge) against models/endpoints. Design<br />
+for <strong>reproducibility</strong> (pinned data/seeds) and <strong>comparability</strong> (same harness across<br />
+model versions — ties to Domain 9 continuous benchmarking).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> A framework must also scale to many models/large sets — how? (6.14)</div>
+    </div>
+
+    <div class="verse-box" id="v-6.14">
+        <div class="verse-title"><strong>Verse 6.14</strong> — Scalable / automated evaluation harness</div>
+        <div class="meta">Objective 6.4</div>
+        <div class="body">
+<p>Automate eval as part of CI/CD and the model lifecycle: batch inference across GPUs,<br />
+parallelize LLM-judge calls, cache results, and gate releases on metric thresholds<br />
+(a failing eval blocks promotion). Integrate with the serving/monitoring stack so<br />
+production traffic can be periodically re-scored (continuous benchmarking, 9.07). Store<br />
+results with model+data+config versions for auditability. This closes the loop from<br />
+Evaluation into Deployment and Monitoring.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> With models measured, the next question is running them efficiently on GPUs — **Domain 7: GPU Acceleration &amp; Optimization.**</div>
+    </div>
+
+    <div class="nav">
+        <a href="05-fine-tuning.html">← Previous domain</a>
+        <a href="../index.html">All domains</a>
+        <a href="07-gpu-acceleration.html">Next domain →</a>
+    </div>
+</body>
+</html>

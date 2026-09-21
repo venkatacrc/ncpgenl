@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCP-GENL Domain 4 — Model Optimization</title>
+    <style>
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.45;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #b45309;
+            border-bottom: 2px solid #b45309;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #fff7ed;
+            padding: 10px;
+            border-left: 5px solid #b45309;
+            margin-top: 30px;
+        }
+        .verse-box {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fff;
+            page-break-inside: avoid;
+        }
+        .verse-title {
+            font-size: 1.05em;
+            margin-bottom: 6px;
+        }
+        .meta {
+            text-align: left;
+            color: #777;
+            font-style: italic;
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+        }
+        .body {
+            font-size: 0.95em;
+            line-height: 1.55;
+        }
+        .body p { margin: 0.55em 0; }
+        .body code {
+            background: #f4f4f5;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 0.92em;
+        }
+        .body pre {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.4;
+        }
+        .body pre code {
+            background: none;
+            padding: 0;
+        }
+        .chain {
+            background-color: #f9f9f9;
+            padding: 8px 10px;
+            border-left: 3px solid #27ae60;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .author-note { text-align: center; color: #777; font-style: italic; margin-bottom: 20px; }
+        .summary { background: #fffbeb; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95em; }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 24px 0 8px;
+            font-size: 0.95em;
+        }
+        .nav a { color: #b45309; text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+        @media print {
+            body { max-width: 100%; padding: 0; }
+            .verse-box { border: 1px solid #ccc; }
+            .nav { display: none; }
+        }
+
+    </style>
+</head>
+<body>
+    <h1>NCP-GENL — Domain 4</h1>
+    <p style="text-align: center;">Model Optimization · exam weight 17%</p>
+    <p class="author-note">34 forward-chained verses for recitation.</p>
+    <div class="summary">
+        Quantization (INT8/FP8/NVFP4), PTQ/QAT, GPTQ/AWQ, sparsity, distillation, TensorRT-LLM.
+    </div>
+    <div class="nav">
+        <a href="../index.html">← All domains</a>
+        <a href="05-fine-tuning.html">Next domain →</a>
+    </div>
+    <h2>The 34 Verses</h2>
+    <div class="verse-box" id="v-4.01">
+        <div class="verse-title"><strong>Verse 4.01</strong> — Optimization taxonomy</div>
+        <div class="meta">Objective 4.1</div>
+        <div class="body">
+<p>Three orthogonal levers to shrink/accelerate a model: <strong>quantization</strong> (fewer bits per<br />
+weight/activation), <strong>pruning/sparsity</strong> (remove weights/structure), <strong>distillation</strong><br />
+(train a smaller student from a larger teacher). They compose. Goals: cut memory<br />
+footprint, raise throughput/lower latency, and fit hardware acceleration paths (Tensor<br />
+Cores, sparse cores). NVIDIA's inference-optimization stack (TensorRT / TensorRT-LLM)<br />
+consumes all three.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Start with quantization — what does it mathematically do to a value? (4.02)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.02">
+        <div class="verse-title"><strong>Verse 4.02</strong> — Quantization: scale &amp; zero-point</div>
+        <div class="meta">Objective 4.1, 4.2</div>
+        <div class="body">
+<p>Quantization maps floats to low-bit integers via an affine transform:</p>
+<p>$$q=\text{round}(x/s)+z,\qquad x\approx s\,(q-z)$$</p>
+<ul>
+<li><strong>scale</strong> <code>s = (x_max − x_min) / (q_max − q_min)</code> sets resolution.</li>
+<li><strong>zero-point</strong> <code>z</code> is the integer that maps to real 0.</li>
+<li><strong>Symmetric</strong> quantization forces <code>z=0</code> (range <code>[−a, a]</code>); <strong>asymmetric/affine</strong><br />
+  allows a nonzero <code>z</code> (range <code>[x_min, x_max]</code>), better for skewed activations (e.g.<br />
+  post-ReLU). Weights → usually symmetric; activations → often asymmetric.</li>
+</ul>
+<pre><code class="language-python">def quantize(x, s, z, qmin=-128, qmax=127):
+    return (x / s + z).round().clamp(qmin, qmax)
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> One scale for a whole tensor is coarse — at what granularity should scales apply? (4.03)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.03">
+        <div class="verse-title"><strong>Verse 4.03</strong> — Quantization granularity</div>
+        <div class="meta">Objective 4.2</div>
+        <div class="body">
+<p>Scale/zero-point can be shared at different granularities:<br />
+- <strong>Per-tensor</strong>: one scale for the whole tensor — cheapest, least accurate.<br />
+- <strong>Per-channel</strong> (per output channel of a weight matrix): a scale per row — standard<br />
+  for weights, much better accuracy at negligible cost.<br />
+- <strong>Per-group / per-block</strong> (e.g. groups of 128 weights): finest, used by GPTQ/AWQ and<br />
+  low-bit (INT4) schemes to contain outliers.</p>
+<p>Finer granularity → higher accuracy, slightly more metadata. Activations are usually<br />
+per-tensor or per-token.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Granularity aside, do we quantize only weights or activations too? (4.04)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.04">
+        <div class="verse-title"><strong>Verse 4.04</strong> — Weight-only vs weight+activation quantization</div>
+        <div class="meta"></div>
+        <div class="body">
+<p><strong>Objectives:</strong> 4.1, 4.2</p>
+<ul>
+<li><strong>Weight-only</strong> (e.g. INT4/INT8 weights, FP16 activations): shrinks memory and is<br />
+<strong>memory-bandwidth-bound decode</strong>'s friend — the decode phase is dominated by<br />
+  weight loading, so smaller weights = faster. Compute still in FP16. GPTQ/AWQ are<br />
+  weight-only.</li>
+<li><strong>Weight + activation</strong> (e.g. W8A8 INT8, FP8): also quantizes activations so the<br />
+<strong>GEMM runs in low precision on Tensor Cores</strong>, raising compute throughput —<br />
+  essential for compute-bound prefill/large batch. Harder: activations have outliers<br />
+  (→ SmoothQuant, 4.15).</li>
+</ul>
+        </div>
+<div class="chain"><strong>Chain →</strong> Concretely, what does INT8 quantization look like end to end? (4.05)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.05">
+        <div class="verse-title"><strong>Verse 4.05</strong> — INT8 quantization mechanics</div>
+        <div class="meta">Objective 4.2</div>
+        <div class="body">
+<p>INT8 = 8-bit signed integers, range [−128, 127]. On NVIDIA Tensor Cores INT8 GEMM<br />
+roughly doubles throughput vs FP16 and halves weight memory. Accuracy is preserved by<br />
+per-channel weight scales + calibrated activation scales (4.10). INT8 is the <strong>A100<br />
+fallback</strong> for FP8 workflows: same "low-precision GEMM" concept, available on Ampere.<br />
+Supported on A100 and H100.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> H100 adds an 8-bit *floating* format — how does FP8 differ from INT8? (4.06)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.06">
+        <div class="verse-title"><strong>Verse 4.06</strong> — FP8 (E4M3 / E5M2) mechanics  `[H100-ONLY]`</div>
+        <div class="meta">Objective 4.2</div>
+        <div class="body">
+<p>FP8 is 8-bit <strong>floating point</strong> with two formats: <strong>E4M3</strong> (4 exponent, 3 mantissa —<br />
+more precision, less range; used for weights/activations) and <strong>E5M2</strong> (5 exponent, 2<br />
+mantissa — more range, less precision; used for gradients). Unlike INT8's uniform<br />
+steps, FP8's floating format handles wide dynamic range better, so it needs less<br />
+careful calibration. Hardware: <strong>Hopper (H100) and later</strong> via the <strong>Transformer<br />
+Engine</strong> (7.13).</p>
+<blockquote>
+<p><strong>A100 fallback:</strong> use INT8 (4.05) or BF16 — same low-precision-GEMM concept without<br />
+Hopper FP8 units.</p>
+</blockquote>
+        </div>
+<div class="chain"><strong>Chain →</strong> FP8/INT8 are 8-bit; how do the 16-bit float formats compare? (4.07)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.07">
+        <div class="verse-title"><strong>Verse 4.07</strong> — FP16 vs BF16 vs TF32 numerics</div>
+        <div class="meta">Objective 4.2</div>
+        <div class="body">
+<ul>
+<li><strong>FP16</strong>: 1-5-10 (sign-exp-mantissa). High precision, <strong>narrow range</strong> → overflow/<br />
+  underflow; training needs <strong>loss scaling</strong> (7.10).</li>
+<li><strong>BF16</strong>: 1-8-7. Same exponent range as FP32 (no loss scaling needed), less mantissa<br />
+  precision. Preferred for LLM training stability. Ampere+.</li>
+<li><strong>TF32</strong>: 1-8-10 (19 bits used in Tensor Core matmul). A "free" FP32 speedup —<br />
+  FP32 storage, reduced-precision matmul. Default for <code>torch</code> matmul on Ampere+.</li>
+</ul>
+<p>Rule of thumb: <strong>BF16 for training stability</strong>, FP16 where hardware/legacy demands,<br />
+TF32 as a drop-in FP32 accelerator.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Below 8 bits lies FP4 — what should I know conceptually? (4.08)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.08">
+        <div class="verse-title"><strong>Verse 4.08</strong> — FP4 / NVFP4 (Blackwell) — conceptual</div>
+        <div class="meta">Objective 4.2</div>
+        <div class="body">
+<p>FP4 = 4-bit floating point; <strong>NVFP4</strong> is NVIDIA's Blackwell-era format pairing FP4<br />
+values with fine-grained (micro-block) scaling factors to retain accuracy at extreme<br />
+compression. Enables very high inference throughput and tiny memory footprints on<br />
+<strong>Blackwell</strong> Tensor Cores (e.g. <strong>GB200</strong>), and FP4 <em>training</em> via the <strong>2nd-gen<br />
+Transformer Engine</strong>. Exam may reference it conceptually. If you have Blackwell<br />
+(<code>sm_100</code>), it is a real, runnable path — see Lab 4's <code>[GB200]</code> NVFP4 branch; on A100/H100<br />
+fall back to INT8/FP8. Contrast: INT4 (uniform) vs NVFP4 (floating + micro-scaling).</p>
+<blockquote>
+<p><strong>Stale-knowledge flag:</strong> NVFP4 vs MXFP4 naming and block sizes are new/unstable.<br />
+VERIFY against current docs.</p>
+</blockquote>
+        </div>
+<div class="chain"><strong>Chain →</strong> Formats decided, how do we actually apply quantization after training? (4.09)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.09">
+        <div class="verse-title"><strong>Verse 4.09</strong> — PTQ workflow (calibration)</div>
+        <div class="meta">Objective 4.2</div>
+        <div class="body">
+<p><strong>Post-Training Quantization</strong>: take a trained FP model, run a small <strong>calibration<br />
+dataset</strong> (a few hundred representative samples) through it to record activation<br />
+ranges, compute scales/zero-points, and convert. No retraining, fast, no labels.<br />
+Accuracy usually holds for INT8/FP8; can degrade at INT4 or on sensitive layers.<br />
+Calibration data <strong>must</strong> match the deployment distribution.</p>
+<pre><code class="language-text">FP model -&gt; forward calibration set -&gt; collect activation histograms
+         -&gt; compute per-tensor/channel scales -&gt; emit quantized model
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> How exactly are activation ranges chosen from those histograms? (4.10)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.10">
+        <div class="verse-title"><strong>Verse 4.10</strong> — Calibration methods</div>
+        <div class="meta">Objective 4.2</div>
+        <div class="body">
+<p>Choosing the clip range from activation histograms:<br />
+- <strong>Min-max</strong>: use observed min/max — simple but outlier-sensitive (one spike widens<br />
+  the range, wasting resolution).<br />
+- <strong>Entropy / KL-divergence</strong>: pick the clip threshold that minimizes KL between FP and<br />
+  quantized distributions — TensorRT's default for INT8; robust to outliers.<br />
+- <strong>Percentile</strong>: clip at e.g. 99.99th percentile — discards extreme tails.</p>
+<p>TensorRT exposes these as calibrators (<code>IInt8EntropyCalibrator2</code>, etc.). Wrong choice →<br />
+either clipped signal or wasted range → accuracy loss.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> PTQ can still lose accuracy — when must we instead train with quantization? (4.11)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.11">
+        <div class="verse-title"><strong>Verse 4.11</strong> — QAT workflow (fake-quant, STE)</div>
+        <div class="meta">Objective 4.2</div>
+        <div class="body">
+<p><strong>Quantization-Aware Training</strong> inserts <strong>fake-quantize</strong> nodes (quantize→dequantize)<br />
+into the forward pass so the model <em>learns</em> weights robust to quantization error. The<br />
+non-differentiable rounding is bypassed in backprop by the <strong>Straight-Through<br />
+Estimator (STE)</strong> — gradient passes through as identity. Requires training data,<br />
+compute, and labels, but recovers accuracy that PTQ loses (especially at low bit-widths<br />
+or sensitive models). Usually fine-tune from a trained checkpoint.</p>
+<pre><code class="language-python">def fake_quant(x, s, z):
+    q = (x / s + z).round().clamp(-128, 127)
+    xq = (q - z) * s
+    return x + (xq - x).detach()   # STE: forward=xq, backward=identity
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> With both PTQ and QAT available, which do I pick and when? (4.12)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.12">
+        <div class="verse-title"><strong>Verse 4.12</strong> — PTQ vs QAT decision</div>
+        <div class="meta">Objective 4.2</div>
+        <div class="body">
+<table>
+<thead>
+<tr>
+<th></th>
+<th>PTQ</th>
+<th>QAT</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Retraining</td>
+<td>none</td>
+<td>yes (fine-tune)</td>
+</tr>
+<tr>
+<td>Data</td>
+<td>small calibration set, no labels</td>
+<td>labeled training data</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>minutes</td>
+<td>hours–days</td>
+</tr>
+<tr>
+<td>Accuracy</td>
+<td>good for INT8/FP8</td>
+<td>best, recovers low-bit loss</td>
+</tr>
+<tr>
+<td>Use when</td>
+<td>INT8/FP8, tight timeline</td>
+<td>INT4/aggressive, accuracy-critical, PTQ dropped too much</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule:</strong> try PTQ first; escalate to QAT only if the measured accuracy drop is<br />
+unacceptable. QAT is <strong>mandatory</strong> when target bit-width (e.g. INT4) or a sensitive<br />
+model makes PTQ accuracy collapse.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> For LLM weights specifically, what PTQ algorithms beat naive min-max? (4.13)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.13">
+        <div class="verse-title"><strong>Verse 4.13</strong> — GPTQ</div>
+        <div class="meta">Objective 4.2</div>
+        <div class="body">
+<p><strong>GPTQ</strong> is a one-shot, layer-wise weight-only PTQ method for LLMs. It quantizes<br />
+weights column-by-column while using <strong>second-order (Hessian) information</strong> to update<br />
+remaining weights and compensate for the error introduced — minimizing output error per<br />
+layer. Enables accurate INT4/INT3 weight quantization with a small calibration set.<br />
+Weight-only → accelerates memory-bound decode; compute stays FP16.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> GPTQ compensates weights; what if the *activations* are the problem? (4.14)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.14">
+        <div class="verse-title"><strong>Verse 4.14</strong> — AWQ (Activation-aware Weight Quantization)</div>
+        <div class="meta">Objective 4.2</div>
+        <div class="body">
+<p><strong>AWQ</strong> observes that a small fraction of weight channels are <strong>salient</strong> (aligned with<br />
+large-magnitude activations) and dominate output error. It <strong>scales</strong> those salient<br />
+channels before quantization (protecting them) rather than keeping them in high<br />
+precision, achieving accurate INT4 weight-only quantization that generalizes across<br />
+domains without heavy calibration. Popular for LLM deployment (supported in<br />
+TensorRT-LLM).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> AWQ protects salient weights; the dual problem is activation outliers — what handles those? (4.15)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.15">
+        <div class="verse-title"><strong>Verse 4.15</strong> — SmoothQuant (activation outlier migration)</div>
+        <div class="meta">Objective 4.2</div>
+        <div class="body">
+<p>Activations in LLMs have large per-channel outliers that make W8A8 activation<br />
+quantization hard. <strong>SmoothQuant</strong> migrates the difficulty from activations to weights<br />
+by a per-channel smoothing factor: <code>Y = (X · diag(s)^{-1}) · (diag(s) · W)</code>. Dividing<br />
+activations by <code>s</code> and multiplying weights by <code>s</code> leaves the product unchanged but<br />
+flattens activation outliers, enabling accurate INT8 <strong>weight+activation</strong> quantization<br />
+(fast compute-bound GEMM). Complements weight-only GPTQ/AWQ.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Weights and activations aside, the KV cache is huge — can we quantize that too? (4.16)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.16">
+        <div class="verse-title"><strong>Verse 4.16</strong> — KV-cache quantization</div>
+        <div class="meta">Objective 4.6</div>
+        <div class="body">
+<p>At long context/large batch, the <strong>KV cache</strong> (4.26) dominates memory. Quantizing<br />
+cached keys/values to <strong>INT8</strong> (A100-OK) or <strong>FP8</strong> (<code>[H100-ONLY]</code>) roughly halves KV<br />
+memory, enabling longer context or higher concurrency, with small accuracy impact.<br />
+Trade-off: extra quant/dequant per step and possible quality loss on very long context.<br />
+TensorRT-LLM exposes INT8/FP8 KV-cache flags.</p>
+<blockquote>
+<p><strong>A100 fallback:</strong> INT8 KV cache demonstrates the same memory-halving concept without<br />
+FP8 hardware.</p>
+</blockquote>
+        </div>
+<div class="chain"><strong>Chain →</strong> Quantization shrinks values; the other memory lever is removing weights — what is pruning? (4.17)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.17">
+        <div class="verse-title"><strong>Verse 4.17</strong> — Pruning: unstructured vs structured</div>
+        <div class="meta">Objective 4.1</div>
+        <div class="body">
+<p><strong>Unstructured pruning</strong> zeros individual weights by magnitude → high sparsity but<br />
+irregular; needs specialized kernels to see speedup (dense hardware ignores the zeros).<br />
+<strong>Structured pruning</strong> removes whole units (neurons, heads, channels, layers) →<br />
+immediate dense speedup and smaller matrices, but coarser and usually needs<br />
+fine-tuning to recover accuracy. Structured is deployment-friendly; unstructured<br />
+maximizes theoretical sparsity.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> NVIDIA hardware accelerates a *specific* structured sparsity pattern — which one and what does it require? (4.18)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.18">
+        <div class="verse-title"><strong>Verse 4.18</strong> — 2:4 structured sparsity requirements</div>
+        <div class="meta">Objective 4.1</div>
+        <div class="body">
+<p>NVIDIA <strong>Sparse Tensor Cores</strong> (Ampere A100 and later) accelerate <strong>2:4 fine-grained<br />
+structured sparsity</strong>: in every contiguous group of <strong>4</strong> weights, exactly <strong>2 must be<br />
+zero</strong>. This fixed pattern is what the hardware exploits for ~2× GEMM throughput —<br />
+arbitrary/unstructured sparsity does <strong>not</strong> qualify. Workflow: train dense → prune to<br />
+the 2:4 mask → <strong>fine-tune</strong> to recover accuracy → deploy (TensorRT). Only the 2:4<br />
+pattern gets the speedup.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> 2:4 sparsity pairs powerfully with low precision — how do they combine in TensorRT? (4.19)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.19">
+        <div class="verse-title"><strong>Verse 4.19</strong> — Sparsity + INT8 (TensorRT)</div>
+        <div class="meta">Objective 4.1</div>
+        <div class="body">
+<p>2:4 structured sparsity and INT8 quantization <strong>stack</strong>: the Sparse Tensor Core runs an<br />
+INT8 GEMM at ~2× the dense INT8 rate, compounding memory and throughput gains. NVIDIA's<br />
+recommended workflow (per the "Sparsity in INT8" guidance): prune to 2:4, quantize<br />
+(PTQ/QAT), fine-tune to recover, then build a TensorRT engine that enables both sparse<br />
+and INT8 kernels. Verify the engine actually selected sparse+INT8 tactics (not a dense<br />
+fallback).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Beyond quantization and pruning, how do we make an entirely smaller model? (4.20)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.20">
+        <div class="verse-title"><strong>Verse 4.20</strong> — Knowledge distillation: teacher, student, soft targets</div>
+        <div class="meta">Objective 4.3</div>
+        <div class="body">
+<p>Train a small <strong>student</strong> to mimic a large <strong>teacher</strong>. Beyond hard labels, the student<br />
+learns from the teacher's <strong>soft targets</strong> (full probability distribution), which carry<br />
+"dark knowledge" about class similarities. A <strong>temperature</strong> <code>T</code> softens the teacher's<br />
+logits to expose that structure: <code>p_i = softmax(z_i/T)</code>. Student learns far more per<br />
+example than from one-hot labels alone.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> How is the distillation loss actually formed from those soft targets? (4.21)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.21">
+        <div class="verse-title"><strong>Verse 4.21</strong> — Distillation loss (KL + CE blend)</div>
+        <div class="meta">Objective 4.3</div>
+        <div class="body">
+<p>$$\mathcal{L}=\alpha\,T^2\,\text{KL}(p_T^{teacher}\;|\;p_T^{student})+(1-\alpha)\,\text{CE}(y,\,p^{student})$$</p>
+<ul>
+<li>KL term matches softened distributions (temperature <code>T</code>); the <code>T²</code> factor rescales<br />
+  gradient magnitude softened by <code>T</code>.</li>
+<li>CE term keeps the student honest to ground-truth labels.</li>
+<li><code>α</code> balances the two.</li>
+</ul>
+<pre><code class="language-python">import torch.nn.functional as F
+def distill_loss(s_logits, t_logits, y, T=2.0, alpha=0.5):
+    kl = F.kl_div(F.log_softmax(s_logits/T, -1), F.softmax(t_logits/T, -1),
+                  reduction=&quot;batchmean&quot;) * (T*T)
+    ce = F.cross_entropy(s_logits, y)
+    return alpha*kl + (1-alpha)*ce
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> What real model demonstrates this, and what variants exist? (4.22)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.22">
+        <div class="verse-title"><strong>Verse 4.22</strong> — DistilBERT &amp; distillation variants</div>
+        <div class="meta">Objective 4.3</div>
+        <div class="body">
+<p><strong>DistilBERT</strong>: ~40% smaller, ~60% faster, retains ~97% of BERT's language<br />
+understanding — distilled with a triple loss (MLM + distillation KL + cosine embedding<br />
+alignment). Variant taxonomy:<br />
+- <strong>Response-based</strong>: match output logits/soft targets (4.20).<br />
+- <strong>Feature-based</strong>: match intermediate hidden states/attention maps.<br />
+- <strong>Relation-based</strong>: match relationships between layers/samples.</p>
+<p>Distillation composes with quantization and pruning for maximum compression.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Compression handled — how do we accelerate the model on the actual GPU runtime? (4.23)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.23">
+        <div class="verse-title"><strong>Verse 4.23</strong> — TensorRT: builder, engine, precision flags</div>
+        <div class="meta">Objective 4.6</div>
+        <div class="body">
+<p><strong>TensorRT</strong> is NVIDIA's inference optimizer/runtime. It ingests a model (ONNX), then<br />
+the <strong>builder</strong> applies <strong>layer/tensor fusion</strong>, <strong>kernel auto-tuning</strong> (picks fastest<br />
+tactics for the target GPU), precision selection (FP16/INT8/FP8), and memory planning,<br />
+producing a serialized <strong>engine</strong> optimized for that specific GPU. Precision flags<br />
+(<code>FP16</code>, <code>INT8</code> + calibrator, sparsity) gate which kernels are considered. Engines are<br />
+hardware-specific — rebuild per GPU architecture.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> TensorRT is general; what specializes it for transformer LLMs? (4.24)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.24">
+        <div class="verse-title"><strong>Verse 4.24</strong> — TensorRT-LLM: engine build workflow</div>
+        <div class="meta">Objective 4.6</div>
+        <div class="body">
+<p><strong>TensorRT-LLM</strong> is the LLM-specialized layer on TensorRT: optimized attention kernels,<br />
+<strong>in-flight (continuous) batching</strong> (8.08), <strong>paged KV cache</strong>, tensor/pipeline<br />
+parallelism, and quantization (INT8/FP8/INT4 GPTQ/AWQ, and <strong>NVFP4</strong> on Blackwell/GB200,<br />
+4.08). Workflow:</p>
+<pre><code class="language-text">HF checkpoint -&gt; convert_checkpoint.py (choose dtype/quant, TP/PP)
+             -&gt; trtllm-build (build engine, set max batch/seq, KV cache)
+             -&gt; run via TensorRT-LLM runtime or Triton TRT-LLM backend
+</code></pre>
+<blockquote>
+<p><strong>Stale-knowledge flag:</strong> exact script names/flags (<code>convert_checkpoint.py</code>,<br />
+<code>trtllm-build</code>) change frequently. VERIFY.</p>
+</blockquote>
+        </div>
+<div class="chain"><strong>Chain →</strong> Some kernels are Hopper-specific — what plugins matter and what&#x27;s the A100 fallback? (4.25)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.25">
+        <div class="verse-title"><strong>Verse 4.25</strong> — TensorRT-LLM plugins (Hopper-specific)  `[H100-ONLY]`</div>
+        <div class="meta">Objective 4.6</div>
+        <div class="body">
+<p>TensorRT-LLM uses <strong>plugins</strong> — custom fused kernels (e.g. GPT attention plugin,<br />
+paged-KV, FP8 GEMM). Some tactics are <strong>Hopper-specific</strong>: FP8 GEMM plugins and<br />
+FlashAttention variants that exploit Hopper's TMA/WGMMA and FP8 units. The builder<br />
+selects them only on <code>sm_90</code>.</p>
+<blockquote>
+<p><strong>A100 fallback:</strong> on Ampere the builder selects INT8/FP16 fused-attention plugins<br />
+instead — same fused-attention concept, no FP8 path. Build with <code>--dtype float16</code><br />
+(+ INT8) rather than FP8.</p>
+</blockquote>
+        </div>
+<div class="chain"><strong>Chain →</strong> Attention plugins manage the KV cache — how big is it, exactly? (4.26)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.26">
+        <div class="verse-title"><strong>Verse 4.26</strong> — KV-cache memory formula</div>
+        <div class="meta">Objective 4.6</div>
+        <div class="body">
+<p>Per-token KV cache size (bytes):</p>
+<p>$$\text{KV} = 2 \times n_{\text{layers}} \times n_{\text{kv_heads}} \times d_{\text{head}} \times \text{bytes}$$</p>
+<p>The leading <strong>2</strong> = keys + values. Total = <code>× seq_len × batch</code>. Example: 32 layers,<br />
+32 KV heads, head_dim 128, FP16 (2 bytes) → per token = 2·32·32·128·2 ≈ <strong>1.05 MB</strong>;<br />
+at 4096 tokens ≈ 4.3 GB <strong>per sequence</strong>. This is why long context/large batch is<br />
+memory-bound and why <strong>GQA/MQA</strong> (fewer <code>n_kv_heads</code>) and KV quantization (4.16) matter.</p>
+<pre><code class="language-python">kv_bytes = 2 * n_layers * n_kv_heads * head_dim * bytes_per_elt  # per token
+total = kv_bytes * seq_len * batch
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> If full attention is O(n²), how do we handle very long sequences cheaply? (4.27)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.27">
+        <div class="verse-title"><strong>Verse 4.27</strong> — Sliding-window / streaming attention</div>
+        <div class="meta">Objective 4.6</div>
+        <div class="body">
+<p><strong>Sliding-window attention</strong> (Mistral) limits each token to attend to the last <code>w</code><br />
+tokens, bounding attention cost and KV cache to <code>O(w)</code> instead of <code>O(n)</code> — enabling long<br />
+/streaming contexts. <strong>StreamingLLM</strong> keeps a few initial "attention-sink" tokens plus a<br />
+recent window to preserve stability across effectively infinite streams. Trade-off:<br />
+tokens beyond the window lose direct access (mitigated by layered receptive fields).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Quantize/prune/distill/serve covered for decoders — how are *encoders* pretrained? (4.28)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.28">
+        <div class="verse-title"><strong>Verse 4.28</strong> — Encoder training: masked language modeling (MLM)</div>
+        <div class="meta">Objective 4.7</div>
+        <div class="body">
+<p>Encoders (BERT) are pretrained with <strong>MLM</strong>: randomly mask ~15% of tokens and predict<br />
+them from <strong>bidirectional</strong> context. BERT's recipe: of the masked 15%, 80% → <code>[MASK]</code>,<br />
+10% → random token, 10% → unchanged (reduces train/inference mismatch since <code>[MASK]</code><br />
+never appears at inference). Contrast with decoder CLM (2.15) which predicts strictly<br />
+left-to-right.</p>
+<pre><code class="language-python"># labels = -100 everywhere except masked positions
+loss = F.cross_entropy(logits.view(-1, V), labels.view(-1), ignore_index=-100)
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> BERT also had a second pretraining objective — what was it and is it kept? (4.29)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.29">
+        <div class="verse-title"><strong>Verse 4.29</strong> — Next sentence prediction (NSP)</div>
+        <div class="meta">Objective 4.7</div>
+        <div class="body">
+<p>BERT's second objective: given sentences A and B, predict whether B truly follows A<br />
+(binary), aimed at sentence-pair tasks (NLI, QA). Later work (<strong>RoBERTa</strong>) showed NSP<br />
+<strong>hurts or is unnecessary</strong> and dropped it, training MLM-only on longer sequences with<br />
+larger batches. Exam-relevant nuance: NSP is <em>historical BERT</em>, not a modern<br />
+requirement.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Optimization also covers decoding-side and search knobs — what advanced sampling affects optimization studies? (4.30)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.30">
+        <div class="verse-title"><strong>Verse 4.30</strong> — Beam search mechanics (optimization view)</div>
+        <div class="meta">Objective 4.5</div>
+        <div class="body">
+<p>Beam search keeps the top-<code>b</code> partial sequences by cumulative log-prob at each step,<br />
+with <strong>length normalization</strong> to avoid bias toward short sequences:<br />
+<code>score = (Σ log p) / len^α</code>. Larger beams find higher-likelihood outputs (better for<br />
+translation/constrained tasks) at linear cost in <code>b</code>; they do <strong>not</strong> help open-ended<br />
+diversity (1.11). In optimization/ablation studies beam width is a knob whose<br />
+throughput cost must be measured against quality gain.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Beam is one knob; how does temperature figure into ablation studies? (4.31)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.31">
+        <div class="verse-title"><strong>Verse 4.31</strong> — Temperature scaling &amp; ablation studies</div>
+        <div class="meta">Objective 4.5</div>
+        <div class="body">
+<p><strong>Temperature scaling</strong> (softmax with <code>z/T</code>) is used two ways: as a decoding knob<br />
+(1.11) and as a <strong>post-hoc calibration</strong> method (fit a single <code>T</code> on a validation set so<br />
+predicted confidence matches accuracy). <strong>Ablation studies</strong> systematically remove/vary<br />
+one factor at a time (a quantization method, a sparsity level, a sampling setting) with<br />
+everything else fixed, to attribute accuracy/throughput changes to that factor. Change<br />
+one variable per run; hold seeds/decoding fixed for fair comparison.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Ablations vary knobs; how do we systematically search *training* hyperparameters? (4.32)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.32">
+        <div class="verse-title"><strong>Verse 4.32</strong> — Learning-rate schedules (warmup, cosine)</div>
+        <div class="meta">Objective 4.4</div>
+        <div class="body">
+<ul>
+<li><strong>Warmup</strong>: linearly ramp LR from ~0 over the first few % of steps to avoid early<br />
+  divergence (critical for transformers/post-LN and large batches).</li>
+<li><strong>Cosine decay</strong>: after warmup, decay LR following a cosine curve to a small final<br />
+  value — the standard LLM schedule.</li>
+<li>Alternatives: linear decay, inverse-sqrt (original Transformer), constant.</li>
+</ul>
+<pre><code class="language-python">from torch.optim.lr_scheduler import LambdaLR
+import math
+def cosine_warmup(step, warmup, total):
+    if step &lt; warmup: return step / warmup
+    p = (step - warmup) / (total - warmup)
+    return 0.5 * (1 + math.cos(math.pi * p))
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> LR interacts with batch size — how do we scale them together? (4.33)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.33">
+        <div class="verse-title"><strong>Verse 4.33</strong> — Batch size &amp; LR (linear scaling rule)</div>
+        <div class="meta">Objective 4.4</div>
+        <div class="body">
+<p><strong>Linear scaling rule</strong>: when you multiply the effective batch size by <code>k</code>, multiply<br />
+the base LR by <code>k</code> (with warmup), because the gradient estimate's variance drops and<br />
+each step is more confident. Holds up to a <strong>critical batch size</strong>, beyond which<br />
+returns diminish and LR must be tempered (or use LAMB for very large batches). Effective<br />
+batch = per-device × devices × grad-accum steps (7.15).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Manual tuning is slow — how do we search hyperparameters at scale? (4.34)</div>
+    </div>
+
+    <div class="verse-box" id="v-4.34">
+        <div class="verse-title"><strong>Verse 4.34</strong> — Distributed hyperparameter search</div>
+        <div class="meta">Objective 4.4</div>
+        <div class="body">
+<ul>
+<li><strong>Grid search</strong>: exhaustive; explodes combinatorially.</li>
+<li><strong>Random search</strong>: samples the space; more efficient than grid for few important<br />
+  dims.</li>
+<li><strong>Bayesian optimization</strong>: models the objective, proposes promising points (Optuna,<br />
+  Ax).</li>
+<li><strong>Population-based training (PBT)</strong>: evolves a population, copying/perturbing good<br />
+  configs during training.</li>
+</ul>
+<p>Distribute trials across GPUs/nodes (Ray Tune, NeMo/Base Command). Use early stopping<br />
+(5.20) to kill weak trials fast.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Optimization complete; the next question is *how well* the optimized model performs — **Domain 5: Fine-Tuning**, then **Domain 6: Evaluation**.</div>
+    </div>
+
+    <div class="nav">
+        <a href="03-data-preparation.html">← Previous domain</a>
+        <a href="../index.html">All domains</a>
+        <a href="05-fine-tuning.html">Next domain →</a>
+    </div>
+</body>
+</html>

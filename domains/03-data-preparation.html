@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCP-GENL Domain 3 — Data Preparation</title>
+    <style>
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.45;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #b45309;
+            border-bottom: 2px solid #b45309;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #fff7ed;
+            padding: 10px;
+            border-left: 5px solid #b45309;
+            margin-top: 30px;
+        }
+        .verse-box {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fff;
+            page-break-inside: avoid;
+        }
+        .verse-title {
+            font-size: 1.05em;
+            margin-bottom: 6px;
+        }
+        .meta {
+            text-align: left;
+            color: #777;
+            font-style: italic;
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+        }
+        .body {
+            font-size: 0.95em;
+            line-height: 1.55;
+        }
+        .body p { margin: 0.55em 0; }
+        .body code {
+            background: #f4f4f5;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 0.92em;
+        }
+        .body pre {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.4;
+        }
+        .body pre code {
+            background: none;
+            padding: 0;
+        }
+        .chain {
+            background-color: #f9f9f9;
+            padding: 8px 10px;
+            border-left: 3px solid #27ae60;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .author-note { text-align: center; color: #777; font-style: italic; margin-bottom: 20px; }
+        .summary { background: #fffbeb; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95em; }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 24px 0 8px;
+            font-size: 0.95em;
+        }
+        .nav a { color: #b45309; text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+        @media print {
+            body { max-width: 100%; padding: 0; }
+            .verse-box { border: 1px solid #ccc; }
+            .nav { display: none; }
+        }
+
+    </style>
+</head>
+<body>
+    <h1>NCP-GENL — Domain 3</h1>
+    <p style="text-align: center;">Data Preparation · exam weight 9%</p>
+    <p class="author-note">18 forward-chained verses for recitation.</p>
+    <div class="summary">
+        Cleaning, NeMo Curator, tokenization (BPE/WordPiece), splits, and fertility.
+    </div>
+    <div class="nav">
+        <a href="../index.html">← All domains</a>
+        <a href="04-model-optimization.html">Next domain →</a>
+    </div>
+    <h2>The 18 Verses</h2>
+    <div class="verse-box" id="v-3.01">
+        <div class="verse-title"><strong>Verse 3.01</strong> — Data cleaning: dedup, normalization</div>
+        <div class="meta">Objective 3.1</div>
+        <div class="body">
+<p>Cleaning removes noise that models otherwise memorize: exact/near-duplicate documents,<br />
+inconsistent Unicode (NFC/NFKC normalization), stray whitespace/control chars, boiler-<br />
+plate, and encoding errors (mojibake). Deduplication both improves generalization and<br />
+prevents train/test leakage. NVIDIA accelerates this at scale with <strong>NeMo Curator</strong><br />
+(3.06) on GPU (RAPIDS).</p>
+<pre><code class="language-python">import unicodedata, re
+def clean(t):
+    t = unicodedata.normalize(&quot;NFKC&quot;, t)
+    t = re.sub(r&quot;\s+&quot;, &quot; &quot;, t).strip()
+    return t
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> After cleaning text, what about records with missing fields? (3.02)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.02">
+        <div class="verse-title"><strong>Verse 3.02</strong> — Missing data &amp; imputation</div>
+        <div class="meta">Objective 3.1</div>
+        <div class="body">
+<p>Options: drop rows/columns (safe when missingness is small and random), or impute<br />
+(mean/median/mode for tabular features; forward/backward fill for sequences; model-<br />
+based imputation). The mechanism matters: MCAR (missing completely at random) tolerates<br />
+simple imputation; MNAR (missing not at random) biases the model if imputed naively.<br />
+For text corpora, "missing" often means empty/short docs — filter by length.</p>
+<pre><code class="language-python">import pandas as pd
+df[&quot;age&quot;] = df[&quot;age&quot;].fillna(df[&quot;age&quot;].median())   # robust to outliers vs mean
+df = df[df[&quot;text&quot;].str.len() &gt;= 20]                 # drop degenerate short docs
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Once complete, are numeric features on comparable scales? (3.03)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.03">
+        <div class="verse-title"><strong>Verse 3.03</strong> — Scaling &amp; normalization</div>
+        <div class="meta">Objective 3.1</div>
+        <div class="body">
+<p>Standardize numeric features so no feature dominates by magnitude: <strong>standardization</strong><br />
+<code>z=(x−μ)/σ</code> (zero mean/unit variance) or <strong>min-max</strong> to [0,1]. Fit scalers on <strong>train<br />
+only</strong>, then apply to val/test to avoid leakage. Mostly relevant to tabular/auxiliary<br />
+features; token embeddings are learned, not scaled. LayerNorm/RMSNorm handle<br />
+activation scaling inside the model (1.01).</p>
+<pre><code class="language-python">from sklearn.preprocessing import StandardScaler
+sc = StandardScaler().fit(X_train)     # fit on train ONLY
+X_train, X_val = sc.transform(X_train), sc.transform(X_val)
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Balanced scales don&#x27;t fix skewed *labels* — how do we detect imbalance? (3.04)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.04">
+        <div class="verse-title"><strong>Verse 3.04</strong> — Class imbalance analysis &amp; mitigation</div>
+        <div class="meta">Objective 3.1</div>
+        <div class="body">
+<p>Skewed class frequencies make a model optimize the majority and ignore rare classes;<br />
+accuracy becomes misleading (use per-class recall / macro-F1, see Domain 6). Mitigate<br />
+with <strong>resampling</strong> (oversample minority / SMOTE, undersample majority), <strong>class-<br />
+weighted loss</strong>, or <strong>focal loss</strong>. For instruction data, imbalance shows up as<br />
+over-represented task types skewing behavior.</p>
+<pre><code class="language-python">import numpy as np, torch
+counts = np.bincount(labels)
+weights = torch.tensor(counts.sum() / (len(counts) * counts), dtype=torch.float)
+loss_fn = torch.nn.CrossEntropyLoss(weight=weights.cuda())
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Beyond labels, what does the overall feature/token distribution look like? (3.05)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.05">
+        <div class="verse-title"><strong>Verse 3.05</strong> — Feature distribution analysis (EDA), RAPIDS cuDF</div>
+        <div class="meta">Objective 3.1</div>
+        <div class="body">
+<p>Profile distributions before training: token-length histograms, vocabulary coverage,<br />
+language/topic mix, outliers, and correlations. On large corpora this is IO/compute<br />
+heavy — <strong>RAPIDS cuDF</strong> gives a pandas-like API on GPU for order-of-magnitude speedups<br />
+(NVIDIA's recommended tool). Length distributions directly drive <code>max_seq_len</code> and<br />
+padding/packing decisions (3.12).</p>
+<pre><code class="language-python">import cudf                       # GPU DataFrame, pandas-like
+df = cudf.read_parquet(&quot;corpus.parquet&quot;)
+print(df[&quot;n_tokens&quot;].describe())  # p50/p95/p99 to pick max_seq_len
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Curating billions of docs by hand is impossible — what pipeline does NVIDIA provide? (3.06)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.06">
+        <div class="verse-title"><strong>Verse 3.06</strong> — NeMo Curator pipeline overview</div>
+        <div class="meta">Objective 3.1</div>
+        <div class="body">
+<p><strong>NeMo Curator</strong> is NVIDIA's GPU-accelerated data-curation library for LLM pretraining/<br />
+fine-tuning corpora. Stages: download/extract → language ID → <strong>quality filtering</strong> →<br />
+<strong>deduplication</strong> (exact + fuzzy) → <strong>PII/content filtering</strong> → decontamination against<br />
+eval sets → format for training. Built on Dask + RAPIDS for multi-GPU/multi-node scale.<br />
+It is the exam's expected answer for "how does NVIDIA curate pretraining data at scale."</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Within Curator, how is low-quality text separated from high-quality? (3.07)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.07">
+        <div class="verse-title"><strong>Verse 3.07</strong> — Quality filtering (heuristic + classifier)</div>
+        <div class="meta">Objective 3.1</div>
+        <div class="body">
+<p>Two layers: <strong>heuristic filters</strong> (document length, symbol-to-word ratio, mean word<br />
+length, fraction of alphabetic chars, repeated-line/n-gram ratios, stop-word presence)<br />
+cheaply drop junk; <strong>classifier-based filters</strong> (a small model scoring "high-quality<br />
+like reference corpus") catch subtler low-quality text. NeMo Curator ships both.<br />
+Over-filtering hurts diversity; tune thresholds against a validation sample.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Filtered text can still contain massive duplication — how is that removed at scale? (3.08)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.08">
+        <div class="verse-title"><strong>Verse 3.08</strong> — Deduplication: exact + fuzzy (MinHash/LSH)</div>
+        <div class="meta">Objective 3.1</div>
+        <div class="body">
+<p><strong>Exact dedup</strong>: hash documents (e.g. document-level or via <code>md5</code>) and drop<br />
+collisions — cheap, catches verbatim copies. <strong>Fuzzy dedup</strong>: <strong>MinHash + LSH</strong><br />
+estimates Jaccard similarity of shingle sets to catch near-duplicates (templated pages,<br />
+reformatted copies) without O(n²) comparison. Dedup reduces memorization, improves<br />
+generalization, and prevents eval-set contamination. NeMo Curator does both on GPU.</p>
+<pre><code class="language-text">shingles -&gt; MinHash signatures -&gt; LSH bucketing -&gt; compare within-bucket -&gt; drop near-dups
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Deduped text may still contain sensitive data — how is that handled? (3.09)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.09">
+        <div class="verse-title"><strong>Verse 3.09</strong> — PII redaction &amp; content filtering</div>
+        <div class="meta">Objective 3.1</div>
+        <div class="body">
+<p>Detect and redact/replace personally identifiable information (names, emails, phone<br />
+numbers, SSNs) via regex + NER models, and filter toxic/unsafe content. Reduces<br />
+compliance risk and the chance the model regurgitates private data (ties to Safety,<br />
+Domain 10). NeMo Curator provides PII modules. Redaction must precede training; you<br />
+cannot un-train leaked PII.</p>
+<pre><code class="language-python">import re
+text = re.sub(r&quot;[\w.+-]+@[\w-]+\.[\w.-]+&quot;, &quot;&lt;EMAIL&gt;&quot;, text)
+text = re.sub(r&quot;\b\d{3}-\d{2}-\d{4}\b&quot;, &quot;&lt;SSN&gt;&quot;, text)
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Clean, deduped, redacted data still needs a *shape* to train on — what format? (3.10)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.10">
+        <div class="verse-title"><strong>Verse 3.10</strong> — Dataset formats: JSONL, prompt-completion, chat templates</div>
+        <div class="meta">Objective 3.2</div>
+        <div class="body">
+<p>Standard training formats: <strong>JSONL</strong> (one example per line), <strong>prompt-completion</strong><br />
+pairs for SFT, and <strong>chat/messages</strong> arrays (<code>role</code>/<code>content</code>) rendered through the<br />
+model's chat template (2.01) so training matches inference formatting. Mismatched<br />
+templates between train and serve are a top silent bug. For preference data (DPO,<br />
+5.06): <code>{prompt, chosen, rejected}</code>.</p>
+<pre><code class="language-json">{&quot;messages&quot;: [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;2+2?&quot;},
+              {&quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: &quot;4&quot;}]}
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> With a format chosen, how do we split data without cheating? (3.11)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.11">
+        <div class="verse-title"><strong>Verse 3.11</strong> — Splits &amp; leakage prevention</div>
+        <div class="meta">Objective 3.2</div>
+        <div class="body">
+<p>Split into train/val/test. Prevent leakage: deduplicate <strong>across</strong> splits (3.08),<br />
+split by <strong>group</strong> (user/document/time) when records are correlated, and <strong>decontaminate</strong><br />
+training data against benchmark/eval sets (a duplicate of a test item in train inflates<br />
+scores). Fit all preprocessing (scalers, tokenizers, filters) on <strong>train only</strong>. Time-<br />
+series/production data → temporal split, never random.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Splits defined — how do we feed terabytes efficiently to the GPUs? (3.12)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.12">
+        <div class="verse-title"><strong>Verse 3.12</strong> — Sharding, memory-mapping &amp; sequence packing</div>
+        <div class="meta">Objective 3.2</div>
+        <div class="body">
+<p>For large corpora: pre-tokenize to binary shards (memory-mapped) so training reads<br />
+without re-tokenizing or loading everything into RAM (NeMo/Megatron use <code>.bin</code>/<code>.idx</code>).<br />
+<strong>Sequence packing</strong> concatenates short examples up to <code>max_seq_len</code> to eliminate<br />
+padding waste — a major throughput win — with attention masking to prevent cross-example<br />
+attention. Shard for parallel data loading across ranks (Domain 7).</p>
+<pre><code class="language-text">docs -&gt; tokenize -&gt; pack to max_seq_len -&gt; write .bin + .idx -&gt; mmap at train time
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Both formatting and packing assume tokens exist — how are tokens produced? (3.13)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.13">
+        <div class="verse-title"><strong>Verse 3.13</strong> — Tokenization: subword rationale</div>
+        <div class="meta">Objective 3.3</div>
+        <div class="body">
+<p>Word-level tokenization explodes vocab and fails on OOV/rare words; character-level<br />
+gives tiny vocab but very long sequences. <strong>Subword</strong> tokenization is the compromise:<br />
+frequent words stay whole, rare words split into meaningful pieces, and any string is<br />
+representable (no true OOV). This bounds vocab size while keeping sequences short — the<br />
+basis of all modern LLM tokenizers.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> What is the dominant algorithm for building subword vocab from data? (3.14)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.14">
+        <div class="verse-title"><strong>Verse 3.14</strong> — BPE (Byte-Pair Encoding) merge rules</div>
+        <div class="meta">Objective 3.3</div>
+        <div class="body">
+<p>BPE starts from characters (or bytes, "byte-level BPE" — GPT-2/Llama) and <strong>greedily<br />
+merges the most frequent adjacent pair</strong> repeatedly, recording an ordered merge list<br />
+until the target vocab size is reached. Encoding re-applies merges in order.<br />
+Byte-level BPE guarantees no OOV for any Unicode input. Used by GPT, RoBERTa, Llama.</p>
+<pre><code class="language-text">init:  l o w &lt;/w&gt;, l o w e r &lt;/w&gt;, ...
+merge most frequent pair (e.g. &quot;l o&quot; -&gt; &quot;lo&quot;), repeat
+final vocab = base chars + learned merges
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> BPE merges by frequency — is there an alternative that merges by likelihood? (3.15)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.15">
+        <div class="verse-title"><strong>Verse 3.15</strong> — WordPiece (likelihood-based)</div>
+        <div class="meta">Objective 3.3</div>
+        <div class="body">
+<p>WordPiece (BERT) also builds subwords but merges the pair that <strong>maximizes the<br />
+likelihood of the training corpus</strong> under a unigram LM, not raw frequency: it picks the<br />
+merge maximizing <code>count(pair)/(count(a)·count(b))</code>. Continuation pieces are marked with<br />
+<code>##</code> (e.g. <code>play</code>, <code>##ing</code>). Encoding is greedy longest-match-first.</p>
+<pre><code class="language-text">&quot;playing&quot; -&gt; [&quot;play&quot;, &quot;##ing&quot;]        # ## marks a non-initial subword
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> With two algorithms in hand, how do we choose between them (and Unigram)? (3.16)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.16">
+        <div class="verse-title"><strong>Verse 3.16</strong> — BPE vs WordPiece vs Unigram/SentencePiece</div>
+        <div class="meta">Objective 3.3</div>
+        <div class="body">
+<ul>
+<li><strong>BPE</strong>: greedy frequency merges; ordered merge list; byte-level variant = no OOV.<br />
+  GPT/Llama/RoBERTa.</li>
+<li><strong>WordPiece</strong>: likelihood-maximizing merges; <code>##</code> continuations; greedy<br />
+  longest-match. BERT.</li>
+<li><strong>Unigram LM</strong>: starts with a large vocab and <em>prunes</em> to maximize corpus likelihood;<br />
+  probabilistic segmentation. T5/ALBERT.</li>
+<li><strong>SentencePiece</strong>: a <em>library/framework</em> (not an algorithm) implementing BPE or<br />
+  Unigram directly on raw text (treats space as a symbol <code>▁</code>), language-agnostic, no<br />
+  pre-tokenization needed.</li>
+</ul>
+        </div>
+<div class="chain"><strong>Chain →</strong> Choosing an algorithm still leaves the vocab-size knob — how is a tokenizer trained and sized? (3.17)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.17">
+        <div class="verse-title"><strong>Verse 3.17</strong> — Training a tokenizer &amp; vocab-size trade-offs</div>
+        <div class="meta">Objective 3.3</div>
+        <div class="body">
+<p>Train on a representative sample; choose vocab size. <strong>Larger vocab</strong> → shorter<br />
+sequences (fewer tokens/word, lower fertility), faster inference, but a bigger embedding<br />
++ softmax matrix (more params/memory) and rarer tokens undertrained. <strong>Smaller vocab</strong><br />
+→ longer sequences, more compute per document. Typical LLM vocabs: 32k–256k. Match the<br />
+tokenizer to the target languages/domains (code, multilingual need larger vocab).</p>
+<pre><code class="language-python">from tokenizers import ByteLevelBPETokenizer
+tk = ByteLevelBPETokenizer()
+tk.train(files=[&quot;corpus.txt&quot;], vocab_size=32000, min_frequency=2)
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Beyond size, which tokens and edge cases decide real efficiency? (3.18)</div>
+    </div>
+
+    <div class="verse-box" id="v-3.18">
+        <div class="verse-title"><strong>Verse 3.18</strong> — Special tokens, OOV &amp; fertility</div>
+        <div class="meta">Objective 3.3</div>
+        <div class="body">
+<p><strong>Special tokens</strong>: <code>[CLS]</code>, <code>[SEP]</code>, <code>&lt;pad&gt;</code>, <code>&lt;eos&gt;</code>, <code>&lt;bos&gt;</code>, chat-role markers —<br />
+must be reserved in the vocab and never split. <strong>OOV</strong>: byte-level BPE has none; other<br />
+schemes fall back to <code>[UNK]</code>. <strong>Fertility</strong> = average tokens per word; high fertility<br />
+(e.g. on code or an unseen language) inflates sequence length, cost, and can exceed<br />
+<code>max_seq_len</code>, silently truncating input. Measure fertility on your actual domain<br />
+before committing (ties to 3.05, 8.02 cost).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Well-prepared, well-tokenized data is the input to optimization — **Domain 4: Model Optimization.**</div>
+    </div>
+
+    <div class="nav">
+        <a href="02-prompt-engineering.html">← Previous domain</a>
+        <a href="../index.html">All domains</a>
+        <a href="04-model-optimization.html">Next domain →</a>
+    </div>
+</body>
+</html>

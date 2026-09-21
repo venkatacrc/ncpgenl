@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCP-GENL Domain 2 — Prompt Engineering</title>
+    <style>
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.45;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #b45309;
+            border-bottom: 2px solid #b45309;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #fff7ed;
+            padding: 10px;
+            border-left: 5px solid #b45309;
+            margin-top: 30px;
+        }
+        .verse-box {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fff;
+            page-break-inside: avoid;
+        }
+        .verse-title {
+            font-size: 1.05em;
+            margin-bottom: 6px;
+        }
+        .meta {
+            text-align: left;
+            color: #777;
+            font-style: italic;
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+        }
+        .body {
+            font-size: 0.95em;
+            line-height: 1.55;
+        }
+        .body p { margin: 0.55em 0; }
+        .body code {
+            background: #f4f4f5;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 0.92em;
+        }
+        .body pre {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.4;
+        }
+        .body pre code {
+            background: none;
+            padding: 0;
+        }
+        .chain {
+            background-color: #f9f9f9;
+            padding: 8px 10px;
+            border-left: 3px solid #27ae60;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .author-note { text-align: center; color: #777; font-style: italic; margin-bottom: 20px; }
+        .summary { background: #fffbeb; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95em; }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 24px 0 8px;
+            font-size: 0.95em;
+        }
+        .nav a { color: #b45309; text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+        @media print {
+            body { max-width: 100%; padding: 0; }
+            .verse-box { border: 1px solid #ccc; }
+            .nav { display: none; }
+        }
+
+    </style>
+</head>
+<body>
+    <h1>NCP-GENL — Domain 2</h1>
+    <p style="text-align: center;">Prompt Engineering · exam weight 13%</p>
+    <p class="author-note">26 forward-chained verses for recitation.</p>
+    <div class="summary">
+        Shot count, chain-of-thought, ReAct, structured output, RAG, and hallucination controls.
+    </div>
+    <div class="nav">
+        <a href="../index.html">← All domains</a>
+        <a href="03-data-preparation.html">Next domain →</a>
+    </div>
+    <h2>The 26 Verses</h2>
+    <div class="verse-box" id="v-2.01">
+        <div class="verse-title"><strong>Verse 2.01</strong> — Prompt anatomy: roles &amp; delimiters</div>
+        <div class="meta">Objective 2.1</div>
+        <div class="body">
+<p>A chat prompt is a structured sequence of <strong>roles</strong> — <code>system</code> (behavior/constraints),<br />
+<code>user</code> (task), <code>assistant</code> (model turns) — rendered into the model's <strong>chat template</strong><br />
+(special tokens like <code>&lt;|system|&gt;</code>, <code>[INST]</code>). Delimiters (triple backticks, XML tags)<br />
+separate instructions from data and reduce injection ambiguity. The system message is<br />
+the highest-leverage, lowest-cost control surface before any fine-tuning.</p>
+<pre><code class="language-python">messages = [
+  {&quot;role&quot;: &quot;system&quot;, &quot;content&quot;: &quot;You are a terse SQL assistant. Output SQL only.&quot;},
+  {&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;users older than 30&quot;},
+]
+prompt = tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> With structure fixed, how does the model do a task it was given zero examples of? (2.02)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.02">
+        <div class="verse-title"><strong>Verse 2.02</strong> — Zero-shot prompting</div>
+        <div class="meta">Objective 2.2</div>
+        <div class="body">
+<p>Zero-shot = instruction only, no examples. Relies entirely on knowledge acquired in<br />
+pretraining/instruction-tuning. Works when the task is common and unambiguous; fails<br />
+when output format or a niche label set must be inferred. Cheapest prompt (fewest<br />
+tokens), lowest steering.</p>
+<pre><code class="language-text">Classify sentiment as positive/negative/neutral.
+Text: &quot;The battery drains too fast.&quot;
+Sentiment:
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> When zero-shot gets the format or label set wrong, what is the smallest fix? (2.03)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.03">
+        <div class="verse-title"><strong>Verse 2.03</strong> — One-shot prompting</div>
+        <div class="meta">Objective 2.2</div>
+        <div class="body">
+<p>One-shot = a single worked example before the query. The example fixes <strong>format</strong> and<br />
+<strong>label vocabulary</strong> more reliably than instructions alone; it demonstrates rather than<br />
+describes. Cheapest way to pin output shape when zero-shot drifts.</p>
+<pre><code class="language-text">Text: &quot;Loved it.&quot; -&gt; Sentiment: positive
+Text: &quot;The battery drains too fast.&quot; -&gt; Sentiment:
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> One example fixes format; what if the task needs the model to generalize across several patterns? (2.04)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.04">
+        <div class="verse-title"><strong>Verse 2.04</strong> — Few-shot prompting &amp; exemplar selection</div>
+        <div class="meta">Objective 2.2</div>
+        <div class="body">
+<p>Few-shot = k examples (typically 2–8). Accuracy rises with informative, <strong>diverse,<br />
+class-balanced</strong> exemplars; degrades with redundant or skewed ones. <strong>Recency/order<br />
+matters</strong> — models over-weight later examples. Retrieval-based selection (pick<br />
+exemplars similar to the query) beats fixed sets on heterogeneous inputs. Bounded by<br />
+context length and cost.</p>
+<pre><code class="language-text"># 3-shot, class-balanced, then the query
+pos -&gt; &quot;Loved it.&quot;
+neg -&gt; &quot;Broke in a week.&quot;
+neu -&gt; &quot;It's fine, nothing special.&quot;
+query -&gt; &quot;The battery drains too fast.&quot;
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Examples fix pattern-matching; but how does adding examples actually change the model without touching its weights? (2.05)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.05">
+        <div class="verse-title"><strong>Verse 2.05</strong> — In-context learning (no weight update)</div>
+        <div class="meta">Objective 2.2</div>
+        <div class="body">
+<p>In-context learning (ICL) = the model conditions on exemplars in the prompt and adapts<br />
+its output distribution <strong>without any gradient step</strong>. Weights are frozen; "learning"<br />
+is transient, living only in the forward pass's activations/KV cache. Implication:<br />
+ICL cannot add durable knowledge or survive across sessions — that is what fine-tuning<br />
+(Domain 5) is for. Distinguish sharply from <strong>prompt learning / P-tuning</strong> (2.12),<br />
+which <em>does</em> train continuous prompt vectors.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> If plain examples aren&#x27;t enough for multi-step reasoning, how do we make the model show its work? (2.06)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.06">
+        <div class="verse-title"><strong>Verse 2.06</strong> — Chain-of-thought (CoT) prompting</div>
+        <div class="meta">Objective 2.1</div>
+        <div class="body">
+<p>CoT elicits intermediate reasoning steps before the final answer, improving<br />
+multi-step arithmetic/logic/commonsense accuracy. It works because generation is<br />
+autoregressive: written steps become context the model conditions on (externalized<br />
+scratchpad). Trade-off: more tokens, higher latency/cost, and reasoning can be<br />
+plausible-but-wrong.</p>
+<pre><code class="language-text">Q: A shelf has 3 boxes of 12 and 2 boxes of 5. How many items?
+A: Let's reason step by step. 3*12=36. 2*5=10. 36+10=46. Answer: 46.
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> CoT needs a worked example — can we trigger reasoning with zero examples? (2.07)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.07">
+        <div class="verse-title"><strong>Verse 2.07</strong> — Zero-shot CoT</div>
+        <div class="meta">Objective 2.1</div>
+        <div class="body">
+<p>Append a trigger phrase — <strong>"Let's think step by step."</strong> — with no exemplars. Elicits<br />
+reasoning cheaply on capable instruct models. Weaker/smaller models may need few-shot<br />
+CoT (2.09). Often paired with a second "extraction" prompt that pulls the final answer<br />
+out of the reasoning trace.</p>
+<pre><code class="language-text">Q: If a train travels 60 km in 45 minutes, what is its speed in km/h?
+A: Let's think step by step.
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> A single reasoning path can go wrong — how do we make reasoning robust? (2.08)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.08">
+        <div class="verse-title"><strong>Verse 2.08</strong> — Self-consistency</div>
+        <div class="meta">Objective 2.1</div>
+        <div class="body">
+<p>Sample <strong>multiple</strong> CoT traces (temperature &gt; 0), then take a <strong>majority vote</strong> over<br />
+final answers. Marginalizes over reasoning paths, correcting single-path errors; large<br />
+accuracy gains on arithmetic/reasoning. Cost scales linearly with the number of<br />
+samples — a compute-for-accuracy trade (a form of test-time scaling, 2.13).</p>
+<pre><code class="language-python">answers = [extract(sample_cot(prompt, temperature=0.7)) for _ in range(8)]
+final = max(set(answers), key=answers.count)   # majority vote
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Voting fixes reasoning; but how do we give the model more examples of the *reasoning itself*? (2.09)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.09">
+        <div class="verse-title"><strong>Verse 2.09</strong> — Few-shot CoT</div>
+        <div class="meta">Objective 2.1</div>
+        <div class="body">
+<p>Provide k exemplars that each include the <strong>reasoning trace</strong>, not just the answer.<br />
+Teaches the model the <em>style</em> and <em>granularity</em> of reasoning for the domain. Best for<br />
+smaller models or specialized formats where zero-shot CoT (2.07) underperforms.<br />
+Exemplar quality dominates: one wrong trace can anchor the model to a bad pattern.</p>
+<pre><code class="language-text">Q: 17 apples, give away 5, buy 12. How many?
+A: 17-5=12. 12+12=24. Answer: 24.
+Q: 8 pens, lose 3, find 4. How many?
+A:
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Reasoning traces alone are passive — how does the model act on tools/the world while reasoning? (2.10)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.10">
+        <div class="verse-title"><strong>Verse 2.10</strong> — ReAct (reason + act)</div>
+        <div class="meta">Objective 2.1</div>
+        <div class="body">
+<p>ReAct interleaves <strong>Thought → Action → Observation</strong> loops: the model reasons, emits a<br />
+tool call (search, calculator, retrieval), reads the result, and continues. Grounds<br />
+reasoning in external state, reducing hallucination on knowledge tasks and enabling<br />
+agents. Requires an orchestration loop that parses actions and feeds observations back.</p>
+<pre><code class="language-text">Thought: I need the current population.
+Action: search(&quot;population of Iceland 2024&quot;)
+Observation: ~383,000
+Thought: That answers it.
+Answer: about 383,000
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> These patterns repeat across queries — how do we parameterize them for reuse? (2.11)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.11">
+        <div class="verse-title"><strong>Verse 2.11</strong> — Prompt templates &amp; parameterization</div>
+        <div class="meta">Objective 2.1</div>
+        <div class="body">
+<p>A template separates fixed instruction scaffolding from variable slots, making prompts<br />
+versionable, testable, and injection-aware. Treat prompts as code: pin a version,<br />
+diff changes, and A/B test (ties to Domain 9 versioning). Escape/validate user-filled<br />
+slots to blunt prompt injection (2.25).</p>
+<pre><code class="language-python">TEMPLATE = (
+  &quot;System: You are a {persona}.\n&quot;
+  &quot;Task: {task}\n&quot;
+  &quot;Constraints: answer in {n} bullet points.\n&quot;
+)
+prompt = TEMPLATE.format(persona=&quot;network engineer&quot;, task=&quot;explain BGP&quot;, n=3)
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Templates use discrete text — can we instead *learn* the prompt as vectors? (2.12)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.12">
+        <div class="verse-title"><strong>Verse 2.12</strong> — Prompt learning: soft vs hard prompts</div>
+        <div class="meta">Objective 2.1</div>
+        <div class="body">
+<p><strong>Hard prompts</strong> are discrete natural-language tokens (everything above). <strong>Soft<br />
+prompts</strong> are continuous, <em>trainable</em> embedding vectors prepended to the input; the<br />
+model weights stay frozen while only these vectors are learned via backprop —<br />
+parameter-efficient adaptation for small datasets/specialized domains. This is the<br />
+bridge to <strong>P-tuning / prefix tuning</strong> in Domain 5 (5.15).</p>
+<pre><code class="language-text">[p1][p2]...[pk]  &lt;actual input tokens&gt;
+# p1..pk are learned float vectors, not tokens from the vocabulary
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Soft prompts help small data — but what if we just spend more inference compute to reason harder? (2.13)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.13">
+        <div class="verse-title"><strong>Verse 2.13</strong> — Test-time scaling / reasoning-token budget</div>
+        <div class="meta">Objective 2.1</div>
+        <div class="body">
+<p>Test-time scaling trades <strong>inference compute</strong> for accuracy: longer reasoning traces,<br />
+more self-consistency samples (2.08), or best-of-N with a verifier. Reasoning models<br />
+expose a "thinking budget" (max reasoning tokens). Diminishing returns and latency/cost<br />
+ceilings apply. NVIDIA framing: this is why serving must budget KV cache and tokens<br />
+per request (ties to 8.02 prefill/decode, 9.03 metrics).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> More compute helps general tasks — but how do we adapt to a *specialized domain* purely through prompting? (2.14)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.14">
+        <div class="verse-title"><strong>Verse 2.14</strong> — Domain adaptation via prompting</div>
+        <div class="meta">Objective 2.1</div>
+        <div class="body">
+<p>For specialized domains or small datasets, adapt <em>without</em> fine-tuning: inject a domain<br />
+glossary/style guide in the system prompt, use retrieved domain snippets (RAG, 2.23),<br />
+and few-shot with in-domain exemplars. Decision boundary: prompt-only adaptation is<br />
+free and instant but capped by context length and cannot add durable knowledge — cross<br />
+over to PEFT/fine-tuning (Domain 5) when volume or consistency demands it.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Prompting adapts a *pretrained* decoder — but how is a decoder trained to predict text in the first place? (2.15)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.15">
+        <div class="verse-title"><strong>Verse 2.15</strong> — Causal language modeling (CLM) objective</div>
+        <div class="meta">Objective 2.3</div>
+        <div class="body">
+<p>Decoders are trained to predict the next token: minimize<br />
+$\mathcal{L}=-\sum_t \log p(x_t \mid x_{&lt;t})$ (cross-entropy over the vocabulary), with<br />
+the causal mask (1.06) guaranteeing no future leakage. This single objective, at scale,<br />
+yields the in-context abilities Domain 2 exploits. Contrast with MLM for encoders<br />
+(4.28).</p>
+<pre><code class="language-python">import torch.nn.functional as F
+# logits: [B, T, V]; labels: [B, T] (input shifted left by 1)
+loss = F.cross_entropy(logits[:, :-1].reshape(-1, V), labels[:, 1:].reshape(-1))
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Predicting `x_t` from `x_{&lt;t}` during training — how do we feed the ground truth efficiently? (2.16)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.16">
+        <div class="verse-title"><strong>Verse 2.16</strong> — Teacher forcing &amp; shifted labels</div>
+        <div class="meta">Objective 2.3</div>
+        <div class="body">
+<p>During training the decoder is fed the <strong>ground-truth</strong> previous tokens (not its own<br />
+predictions) — <em>teacher forcing</em> — so all positions train in parallel in one forward<br />
+pass. Labels are the inputs <strong>shifted by one</strong>; loss is masked on padding and often on<br />
+the prompt portion (train only on the completion). Exposure bias (train sees gold,<br />
+inference sees own outputs) is the known downside.</p>
+<pre><code class="language-python">labels = input_ids.clone()
+labels[:, :prompt_len] = -100     # ignore prompt tokens in loss
+labels[attention_mask == 0] = -100
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> With objective and labels defined, what does a minimal training loop look like? (2.17)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.17">
+        <div class="verse-title"><strong>Verse 2.17</strong> — Train a decoder with CLM (code sketch)</div>
+        <div class="meta">Objective 2.3</div>
+        <div class="body">
+<p>Minimal HF loop: tokenize, let the model shift labels internally (pass <code>labels=input_ids</code><br />
+for pure LM), backprop cross-entropy. This is the substrate SFT (5.01) builds on.</p>
+<pre><code class="language-python">from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+tok = AutoTokenizer.from_pretrained(&quot;gpt2&quot;); tok.pad_token = tok.eos_token
+m = AutoModelForCausalLM.from_pretrained(&quot;gpt2&quot;).cuda().train()
+opt = torch.optim.AdamW(m.parameters(), lr=5e-5)
+batch = tok([&quot;hello world&quot;], return_tensors=&quot;pt&quot;).to(&quot;cuda&quot;)
+out = m(**batch, labels=batch.input_ids)     # HF shifts labels internally
+out.loss.backward(); opt.step(); opt.zero_grad()
+print(float(out.loss))
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> A trained decoder still emits free text — how do we force it into a strict output shape? (2.18)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.18">
+        <div class="verse-title"><strong>Verse 2.18</strong> — Structured output: JSON schema prompting</div>
+        <div class="meta">Objective 2.4</div>
+        <div class="body">
+<p>Ask for machine-parseable output (JSON) and provide the <strong>schema</strong> in the prompt plus a<br />
+one-shot example. Improves parse rates but does <strong>not guarantee</strong> validity — the model<br />
+can still emit malformed JSON. Prompt-level structuring is necessary but not<br />
+sufficient; pair with constrained decoding (2.19) for hard guarantees.</p>
+<pre><code class="language-text">Return ONLY JSON matching:
+{&quot;intent&quot;: string, &quot;entities&quot;: string[], &quot;confidence&quot;: number}
+Text: &quot;book a flight to Tokyo next Friday&quot;
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Prompting for JSON still allows invalid output — how do we make invalid tokens impossible? (2.19)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.19">
+        <div class="verse-title"><strong>Verse 2.19</strong> — Constrained decoding: grammar / logit masking</div>
+        <div class="meta">Objective 2.4</div>
+        <div class="body">
+<p>Constrained decoding restricts the sampling step to tokens allowed by a <strong>grammar</strong><br />
+(CFG/regex/JSON schema). At each step, tokens that would violate the grammar have their<br />
+logits set to <code>-∞</code> (masked), so <strong>invalid output is impossible by construction</strong> — a<br />
+hard guarantee that prompting (2.18) cannot give. Cost: a grammar/state machine and<br />
+per-step mask computation.</p>
+<pre><code class="language-python">def masked_logits(logits, allowed_ids):
+    mask = torch.full_like(logits, float(&quot;-inf&quot;))
+    mask[..., allowed_ids] = 0.0
+    return logits + mask     # only grammar-allowed tokens survive softmax
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Even valid-shaped output can be wrong or unsafe — where does the validation live? (2.20)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.20">
+        <div class="verse-title"><strong>Verse 2.20</strong> — LLM-wrapping module with validation</div>
+        <div class="meta">Objective 2.4</div>
+        <div class="body">
+<p>Wrap the model in a module that (1) builds the prompt from a template, (2) applies<br />
+constrained decoding, (3) <strong>validates</strong> output against a schema/business rules, and<br />
+(4) retries or repairs on failure. This is NVIDIA's "specialized LLM-wrapping module<br />
+with built-in validation" — it turns a probabilistic generator into a dependable<br />
+component and is where guardrails (Domain 10) attach.</p>
+<pre><code class="language-python">def call(model, msg, schema, retries=2):
+    for _ in range(retries + 1):
+        out = model.generate(build_prompt(msg), grammar=schema)
+        ok, parsed = validate(out, schema)
+        if ok: return parsed
+    raise ValueError(&quot;validation failed after retries&quot;)
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Validation catches format errors — but how do we stop the model asserting false facts? (2.21)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.21">
+        <div class="verse-title"><strong>Verse 2.21</strong> — Hallucination reduction via grounding</div>
+        <div class="meta">Objective 2.4</div>
+        <div class="body">
+<p>Reduce fabrication by <strong>grounding</strong>: supply authoritative context (retrieved<br />
+documents, 2.23) and instruct the model to answer <strong>only</strong> from it and to say "I don't<br />
+know" otherwise. Add citations so claims are checkable. Grounding attacks the root<br />
+cause (missing knowledge in-context) better than post-hoc filtering. Deeper mitigation<br />
+(fine-tuning, Guardrails) is in Domains 5 and 10.</p>
+<pre><code class="language-text">Answer using ONLY the context. If the context is insufficient, say &quot;I don't know.&quot;
+Context: {retrieved_chunks}
+Question: {q}
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Grounding constrains content — but who enforces the output policy at runtime? (2.22)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.22">
+        <div class="verse-title"><strong>Verse 2.22</strong> — Guardrails handoff (xref Domain 10)</div>
+        <div class="meta">Objective 2.4</div>
+        <div class="body">
+<p>Output control at runtime is owned by a <strong>guardrails</strong> layer: input rails (block<br />
+malicious/off-topic prompts), output rails (block unsafe/PII/hallucinated content),<br />
+and dialog rails (keep to allowed topics). NVIDIA's tool is <strong>NeMo Guardrails</strong> with<br />
+the <strong>Colang</strong> policy language (full treatment in 10.09–10.10). Prompt engineering<br />
+sets intent; guardrails enforce it independently of the model's cooperation.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Grounding needs relevant context — where does that context come from? (2.23)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.23">
+        <div class="verse-title"><strong>Verse 2.23</strong> — RAG anatomy (context injection)</div>
+        <div class="meta"></div>
+        <div class="body">
+<p><strong>Objectives:</strong> 2.1, 2.4</p>
+<p>Retrieval-Augmented Generation = <strong>retriever + generator</strong>. An embedding model encodes<br />
+the query; a vector store returns top-k relevant chunks; those chunks are injected into<br />
+the prompt; the LLM generates grounded, citable answers. RAG adds fresh/proprietary<br />
+knowledge without retraining and is NVIDIA's default enterprise pattern (NeMo Retriever<br />
++ NIM). It is a <em>prompt-context</em> technique, which is why it lives in Domain 2, not a<br />
+domain of its own.</p>
+<pre><code class="language-text">[system] answer only from context
+[context] &lt;top-k retrieved chunks&gt;
+[user] &lt;question&gt;
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> RAG hinges on retrieval quality — how are chunks embedded and searched? (2.24)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.24">
+        <div class="verse-title"><strong>Verse 2.24</strong> — Retrieval: embedding search &amp; chunking</div>
+        <div class="meta">Objective 2.1</div>
+        <div class="body">
+<p>Documents are split into <strong>chunks</strong> (size/overlap trade recall vs precision), embedded<br />
+(1.09/1.10), and indexed for <strong>approximate nearest-neighbor</strong> (ANN) search by cosine/dot<br />
+similarity. Query embedding → top-k chunks. Levers: chunk size, overlap, k, and<br />
+re-ranking. Poor chunking (too large → diluted; too small → fragmented) is the top RAG<br />
+failure mode. Evaluate with Ragas (6.08).</p>
+<pre><code class="language-python">sims = query_emb @ chunk_embs.T          # [1, N]
+topk = sims.topk(k).indices              # nearest chunks
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Injecting external text into prompts opens an attack surface — what is it? (2.25)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.25">
+        <div class="verse-title"><strong>Verse 2.25</strong> — Prompt injection &amp; jailbreak basics</div>
+        <div class="meta">Objective 2.4</div>
+        <div class="body">
+<p><strong>Prompt injection</strong>: untrusted input (user text or retrieved content) carries<br />
+instructions that override the system prompt ("ignore previous instructions…").<br />
+<strong>Indirect injection</strong> hides instructions in RAG-retrieved documents. <strong>Jailbreaks</strong><br />
+coax the model past its safety policy (role-play, obfuscation). Defenses: strong<br />
+delimiters, treat retrieved text as data not instructions, output rails, and least-<br />
+privilege tool access. Prompting alone is insufficient — enforce with guardrails<br />
+(2.22, Domain 10).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Beyond safety, these same decoding knobs shape user experience — how? (2.26)</div>
+    </div>
+
+    <div class="verse-box" id="v-2.26">
+        <div class="verse-title"><strong>Verse 2.26</strong> — Sampling controls as UX levers</div>
+        <div class="meta">Objective 2.4</div>
+        <div class="body">
+<p>The decoding params from 1.11–1.12 are product controls exposed per request in the<br />
+serving stack (Dynamo-Triton / TensorRT-LLM): low <code>temperature</code> + low <code>top_p</code> for<br />
+deterministic, factual, testable output (code, extraction); higher values for creative<br />
+tasks. <code>max_tokens</code> bounds latency/cost; <code>stop</code> sequences and <code>repetition_penalty</code><br />
+prevent runaway/looping output. Consistency requirements (validation, evals) usually<br />
+push production toward near-greedy settings.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Prompting adapts frozen models with in-context text; but quality output starts upstream with the data — **Domain 3: Data Preparation.**</div>
+    </div>
+
+    <div class="nav">
+        <a href="01-llm-architecture.html">← Previous domain</a>
+        <a href="../index.html">All domains</a>
+        <a href="03-data-preparation.html">Next domain →</a>
+    </div>
+</body>
+</html>

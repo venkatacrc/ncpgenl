@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCP-GENL Domain 5 — Fine-Tuning</title>
+    <style>
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.45;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #b45309;
+            border-bottom: 2px solid #b45309;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #fff7ed;
+            padding: 10px;
+            border-left: 5px solid #b45309;
+            margin-top: 30px;
+        }
+        .verse-box {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fff;
+            page-break-inside: avoid;
+        }
+        .verse-title {
+            font-size: 1.05em;
+            margin-bottom: 6px;
+        }
+        .meta {
+            text-align: left;
+            color: #777;
+            font-style: italic;
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+        }
+        .body {
+            font-size: 0.95em;
+            line-height: 1.55;
+        }
+        .body p { margin: 0.55em 0; }
+        .body code {
+            background: #f4f4f5;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 0.92em;
+        }
+        .body pre {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.4;
+        }
+        .body pre code {
+            background: none;
+            padding: 0;
+        }
+        .chain {
+            background-color: #f9f9f9;
+            padding: 8px 10px;
+            border-left: 3px solid #27ae60;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .author-note { text-align: center; color: #777; font-style: italic; margin-bottom: 20px; }
+        .summary { background: #fffbeb; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95em; }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 24px 0 8px;
+            font-size: 0.95em;
+        }
+        .nav a { color: #b45309; text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+        @media print {
+            body { max-width: 100%; padding: 0; }
+            .verse-box { border: 1px solid #ccc; }
+            .nav { display: none; }
+        }
+
+    </style>
+</head>
+<body>
+    <h1>NCP-GENL — Domain 5</h1>
+    <p style="text-align: center;">Fine-Tuning · exam weight 13%</p>
+    <p class="author-note">26 forward-chained verses for recitation.</p>
+    <div class="summary">
+        SFT, RLHF/PPO, DPO, GRPO, LoRA/QLoRA, contrastive losses, and forgetting.
+    </div>
+    <div class="nav">
+        <a href="../index.html">← All domains</a>
+        <a href="06-evaluation.html">Next domain →</a>
+    </div>
+    <h2>The 26 Verses</h2>
+    <div class="verse-box" id="v-5.01">
+        <div class="verse-title"><strong>Verse 5.01</strong> — SFT: full fine-tuning</div>
+        <div class="meta">Objective 5.1</div>
+        <div class="body">
+<p>Supervised fine-tuning (SFT) continues training a pretrained model on labeled<br />
+(prompt, completion) pairs, updating <strong>all</strong> weights via the CLM loss (2.15) masked to<br />
+the completion (2.16). Full FT gives maximum capacity to adapt but costs<br />
+memory = params + gradients + optimizer states (Adam ≈ 2× params) + activations — often<br />
+prohibitive for large models (motivating PEFT, 5.10). Risk: catastrophic forgetting<br />
+(5.26).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Raw SFT teaches tasks; how do we specifically make a model follow chat instructions? (5.02)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.02">
+        <div class="verse-title"><strong>Verse 5.02</strong> — Instruction tuning &amp; chat format</div>
+        <div class="meta">Objective 5.1</div>
+        <div class="body">
+<p>Instruction tuning is SFT on diverse (instruction, response) data rendered in the chat<br />
+template (2.01, 3.10), teaching the model to follow instructions and hold multi-turn<br />
+conversations. Loss is masked to assistant turns only. Quality/diversity of<br />
+instructions matters more than sheer volume. This produces the "instruct"/"chat"<br />
+variant from a base model.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Instruction-tuned models still may not match human *preferences* — how do we align to those? (5.03)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.03">
+        <div class="verse-title"><strong>Verse 5.03</strong> — RLHF pipeline (SFT → RM → PPO)</div>
+        <div class="meta">Objective 5.1</div>
+        <div class="body">
+<p>Reinforcement Learning from Human Feedback aligns models to preferences in three<br />
+stages: (1) <strong>SFT</strong> base; (2) train a <strong>reward model</strong> (5.04) on human preference<br />
+comparisons; (3) <strong>RL-optimize</strong> the policy against the reward model with <strong>PPO</strong><br />
+(5.05), regularized by a KL penalty to the SFT reference. Powerful but complex: four<br />
+models in memory (policy, reference, reward, value), unstable, expensive.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> The pipeline depends on a reward model — how is it trained? (5.04)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.04">
+        <div class="verse-title"><strong>Verse 5.04</strong> — Reward modeling (preference pairs)</div>
+        <div class="meta">Objective 5.1</div>
+        <div class="body">
+<p>A reward model (RM) scores a response's quality. Trained on human <strong>preference pairs</strong><br />
+(prompt, chosen, rejected) with the Bradley-Terry loss:</p>
+<p>$$\mathcal{L}<em>{RM}=-\log\sigma\big(r</em>\theta(x,y_{chosen})-r_\theta(x,y_{rejected})\big)$$</p>
+<p>The RM is usually the SFT model with a scalar head. It provides the reward signal PPO<br />
+optimizes. Quality/coverage of preference data caps final alignment quality.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> With a reward model, how does PPO update the policy without destroying it? (5.05)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.05">
+        <div class="verse-title"><strong>Verse 5.05</strong> — PPO in RLHF (policy/value, KL penalty)</div>
+        <div class="meta">Objective 5.1</div>
+        <div class="body">
+<p>Proximal Policy Optimization treats generation as RL: the <strong>policy</strong> (LLM) generates,<br />
+the <strong>reward model</strong> scores, a <strong>value</strong> network estimates baselines, and a clipped<br />
+surrogate objective bounds each update. A <strong>KL penalty</strong> to the frozen SFT reference<br />
+keeps the policy from drifting into reward-hacking gibberish:</p>
+<p>$$\text{reward} = r_\theta(x,y) - \beta\,\text{KL}\big(\pi_\theta \,|\, \pi_{ref}\big)$$</p>
+<p>Sensitive to hyperparameters; the value net doubles memory. This complexity motivates<br />
+DPO.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> PPO needs a reward model and RL machinery — can we align directly from preferences instead? (5.06)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.06">
+        <div class="verse-title"><strong>Verse 5.06</strong> — DPO: direct preference optimization</div>
+        <div class="meta">Objective 5.1</div>
+        <div class="body">
+<p>DPO skips the explicit reward model and RL loop: it reparameterizes the RLHF objective<br />
+so the optimal policy defines an <strong>implicit reward</strong>, giving a simple classification<br />
+loss on preference pairs against a frozen reference:</p>
+<p>$$\mathcal{L}<em>{DPO}=-\log\sigma!\Big(\beta\log\frac{\pi</em>\theta(y_w|x)}{\pi_{ref}(y_w|x)}-\beta\log\frac{\pi_\theta(y_l|x)}{\pi_{ref}(y_l|x)}\Big)$$</p>
+<p>(<code>y_w</code>=chosen, <code>y_l</code>=rejected). Only policy + reference in memory; stable, no reward<br />
+model, no sampling loop. The <code>β</code> controls deviation from the reference.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> DPO is simpler than PPO — when would I still prefer one over the other? (5.07)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.07">
+        <div class="verse-title"><strong>Verse 5.07</strong> — DPO vs RLHF/PPO tradeoffs</div>
+        <div class="meta">Objective 5.1</div>
+        <div class="body">
+<ul>
+<li><strong>DPO</strong>: simpler, stable, cheaper (no RM/value net, no online sampling), needs a fixed<br />
+  preference dataset. Can overfit to the dataset and is off-policy.</li>
+<li><strong>PPO/RLHF</strong>: on-policy exploration via a reward model can exceed the static dataset<br />
+  and optimize non-differentiable/complex rewards, but is unstable, memory-heavy, and<br />
+  hard to tune.</li>
+</ul>
+<p><strong>Rule:</strong> default to DPO for preference alignment; use PPO when you need online<br />
+exploration, a learned reward covering many behaviors, or reward signals you can't bake<br />
+into pairs.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Both DPO and PPO have limits — what newer method drops the value network for reasoning RL? (5.08)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.08">
+        <div class="verse-title"><strong>Verse 5.08</strong> — GRPO: group relative policy optimization</div>
+        <div class="meta">Objective 5.1</div>
+        <div class="body">
+<p>GRPO (from DeepSeek-R1-style reasoning training) removes PPO's <strong>value network</strong>:<br />
+for each prompt it samples a <strong>group</strong> of <code>G</code> responses, scores them (often with a<br />
+verifiable/rule-based reward), and uses the <strong>group mean/std as the baseline</strong> so the<br />
+advantage is each response's reward normalized within its group:</p>
+<p>$$A_i=\frac{r_i-\text{mean}(r_{1..G})}{\text{std}(r_{1..G})}$$</p>
+<p>Cheaper than PPO (no value net), well-suited to reasoning tasks with automatic reward<br />
+checking.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> With PPO, DPO, and GRPO on the table, how do I choose? (5.09)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.09">
+        <div class="verse-title"><strong>Verse 5.09</strong> — GRPO vs PPO vs DPO decision</div>
+        <div class="meta">Objective 5.1</div>
+        <div class="body">
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Reward model?</th>
+<th>Value net?</th>
+<th>Data</th>
+<th>Best for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DPO</td>
+<td>no (implicit)</td>
+<td>no</td>
+<td>fixed preference pairs</td>
+<td>cheap, stable preference alignment</td>
+</tr>
+<tr>
+<td>PPO</td>
+<td>yes (learned)</td>
+<td>yes</td>
+<td>online rollouts</td>
+<td>rich/complex rewards, exploration</td>
+</tr>
+<tr>
+<td>GRPO</td>
+<td>reward fn (often rule-based)</td>
+<td><strong>no</strong></td>
+<td>grouped rollouts</td>
+<td>reasoning/verifiable rewards, cheaper RL</td>
+</tr>
+</tbody>
+</table>
+<p>Escalate DPO → GRPO → PPO as reward complexity and need for online exploration rise.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Alignment methods update behavior; but most of us can&#x27;t afford full FT — how do we adapt parameter-efficiently? (5.10)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.10">
+        <div class="verse-title"><strong>Verse 5.10</strong> — LoRA: low-rank decomposition math</div>
+        <div class="meta">Objective 5.2</div>
+        <div class="body">
+<p>LoRA freezes pretrained <code>W₀ ∈ ℝ^{d×k}</code> and learns a <strong>low-rank update</strong>:</p>
+<p>$$W = W_0 + \Delta W = W_0 + \frac{\alpha}{r} BA,\qquad B\in\mathbb{R}^{d\times r},\; A\in\mathbb{R}^{r\times k},\; r\ll\min(d,k)$$</p>
+<p>Only <code>A, B</code> train (parameters ∝ <code>r(d+k)</code> instead of <code>d·k</code>). <code>A</code> init random Gaussian,<br />
+<code>B</code> init zero (so ΔW starts at 0). At inference <code>BA</code> can be <strong>merged</strong> into <code>W₀</code> → zero<br />
+added latency.</p>
+<pre><code class="language-python">delta = (alpha / r) * (B @ A)   # add to W0
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> LoRA has knobs — which matter and how are they set? (5.11)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.11">
+        <div class="verse-title"><strong>Verse 5.11</strong> — LoRA hyperparameters</div>
+        <div class="meta">Objective 5.2</div>
+        <div class="body">
+<ul>
+<li><strong>rank <code>r</code></strong>: capacity of the update (4–64 typical); too low underfits, too high wastes<br />
+  params and risks overfit.</li>
+<li><strong>alpha <code>α</code></strong>: scaling; effective scale <code>α/r</code>. Common heuristic <code>α = 2r</code>.</li>
+<li><strong>target modules</strong>: which projections get adapters — attention <code>q_proj,k_proj,v_proj,
+  o_proj</code> (and often MLP). More targets = more capacity.</li>
+<li><strong>dropout</strong>: regularizes the adapter.</li>
+</ul>
+<pre><code class="language-python">from peft import LoraConfig
+cfg = LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05,
+                 target_modules=[&quot;q_proj&quot;,&quot;k_proj&quot;,&quot;v_proj&quot;,&quot;o_proj&quot;])
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> LoRA still loads the base in FP16 — how do we fine-tune when even that won&#x27;t fit? (5.12)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.12">
+        <div class="verse-title"><strong>Verse 5.12</strong> — QLoRA (4-bit base + LoRA)</div>
+        <div class="meta">Objective 5.2</div>
+        <div class="body">
+<p>QLoRA quantizes the <strong>frozen base</strong> to 4-bit (<strong>NF4</strong>, a normal-float format optimal for<br />
+normally-distributed weights), then trains LoRA adapters in BF16 on top. Adds<br />
+<strong>double quantization</strong> (quantize the quantization constants) and <strong>paged optimizers</strong><br />
+(offload optimizer states to CPU on memory spikes). Result: fine-tune a 65B model on a<br />
+single 48 GB GPU. Base stays 4-bit; gradients flow only into the BF16 adapters.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> One base can host many adapters — how do we serve them together? (5.13)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.13">
+        <div class="verse-title"><strong>Verse 5.13</strong> — Multi-LoRA serving</div>
+        <div class="meta">Objective 5.2</div>
+        <div class="body">
+<p>Because adapters are tiny and the base is shared, one deployment can serve <strong>many LoRA<br />
+adapters</strong> simultaneously, routing each request to its adapter (per-task/per-tenant).<br />
+The base weights load once; adapters swap cheaply (or batch heterogeneously with<br />
+specialized kernels). NVIDIA supports <strong>multi-LoRA</strong> in TensorRT-LLM / NIM. Trade-off:<br />
+un-merged adapters add a small per-layer compute overhead vs a merged single-task model.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> LoRA is one PEFT family — what are the alternatives? (5.14)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.14">
+        <div class="verse-title"><strong>Verse 5.14</strong> — Adapters (bottleneck modules)</div>
+        <div class="meta">Objective 5.2</div>
+        <div class="body">
+<p>Adapter tuning inserts small <strong>bottleneck</strong> modules (down-project → nonlinearity →<br />
+up-project, with a residual) <strong>between</strong> frozen transformer sublayers; only adapters<br />
+train. Unlike LoRA (which reparameterizes existing weight matrices and can be merged),<br />
+adapters add <strong>new layers</strong>, so they <strong>cannot be merged away</strong> and add inference latency.<br />
+Historically first PEFT method; LoRA largely superseded it for LLMs.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> LoRA/adapters modify weights or add layers — is there a PEFT that only touches the input? (5.15)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.15">
+        <div class="verse-title"><strong>Verse 5.15</strong> — P-tuning / prefix tuning (continuous prompts)</div>
+        <div class="meta">Objective 5.2</div>
+        <div class="body">
+<p><strong>Prompt tuning / P-tuning</strong> prepend trainable <strong>continuous embedding vectors</strong> (soft<br />
+prompts, 2.12) to the input; the model and all real weights stay frozen — only the<br />
+prompt vectors train. <strong>Prefix tuning</strong> goes further: it prepends trainable vectors to<br />
+the <strong>keys/values at every layer</strong>, not just the input embedding, giving more capacity.<br />
+Extremely parameter-efficient (thousands of params), but usually less expressive than<br />
+LoRA for hard tasks.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> There are two P-tuning variants — how do they differ? (5.16)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.16">
+        <div class="verse-title"><strong>Verse 5.16</strong> — P-tuning v2 vs prompt tuning</div>
+        <div class="meta">Objective 5.2</div>
+        <div class="body">
+<ul>
+<li><strong>Prompt tuning / P-tuning (v1)</strong>: soft prompts only at the <strong>input</strong> layer. Works<br />
+  well only at large scale; weak on smaller models and hard sequence-labeling tasks.</li>
+<li><strong>P-tuning v2</strong>: adds tunable prompts at <strong>every layer</strong> (deep prompt tuning, akin to<br />
+  prefix tuning), matching full fine-tuning across scales and tasks.</li>
+</ul>
+<p>NeMo implements P-tuning; the exam may contrast "prompt tuning" (shallow) vs "P-tuning<br />
+v2 / prefix" (deep).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> With four PEFT families known, how do I choose among them and full FT? (5.17)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.17">
+        <div class="verse-title"><strong>Verse 5.17</strong> — PEFT decision: LoRA vs adapters vs P-tuning vs full FT</div>
+        <div class="meta">Objective 5.2</div>
+        <div class="body">
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Trains</th>
+<th>Merge-able?</th>
+<th>Inference cost</th>
+<th>Capacity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Full FT</td>
+<td>all weights</td>
+<td>n/a</td>
+<td>none extra</td>
+<td>highest (+ forgetting risk)</td>
+</tr>
+<tr>
+<td>LoRA/QLoRA</td>
+<td>low-rank ΔW</td>
+<td><strong>yes</strong></td>
+<td>zero if merged</td>
+<td>high</td>
+</tr>
+<tr>
+<td>Adapters</td>
+<td>bottleneck layers</td>
+<td>no</td>
+<td>small latency</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>P-tuning/prefix</td>
+<td>soft prompt vecs</td>
+<td>no</td>
+<td>tiny</td>
+<td>low–medium</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule:</strong> LoRA/QLoRA is the default (mergeable, strong, cheap). Full FT only with ample<br />
+data/compute and forgetting mitigation. P-tuning for extreme parameter efficiency /<br />
+many tasks. Adapters mostly legacy.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> PEFT covers task adaptation; a distinct fine-tuning goal is *embeddings* — how are those trained? (5.18)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.18">
+        <div class="verse-title"><strong>Verse 5.18</strong> — Contrastive loss for embeddings</div>
+        <div class="meta">Objective 5.2</div>
+        <div class="body">
+<p>Embedding models are fine-tuned so similar texts are close and dissimilar far apart.<br />
+- <strong>Triplet loss</strong>: <code>max(0, d(a,p) − d(a,n) + margin)</code> — anchor closer to positive than<br />
+  negative by a margin.<br />
+- <strong>InfoNCE / contrastive</strong>: treat the matching pair as positive against in-batch<br />
+  negatives:</p>
+<p>$$\mathcal{L}=-\log\frac{\exp(\text{sim}(a,p)/\tau)}{\sum_i \exp(\text{sim}(a,n_i)/\tau)}$$</p>
+<p>Temperature <code>τ</code> sharpens; large in-batch negatives help. Basis of retrieval/RAG<br />
+embedding quality (2.24, 6.08).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Contrastive training produces embeddings — what&#x27;s the standard model shape? (5.19)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.19">
+        <div class="verse-title"><strong>Verse 5.19</strong> — Sentence-embedding fine-tuning (bi-encoder)</div>
+        <div class="meta">Objective 5.2</div>
+        <div class="body">
+<p>A <strong>bi-encoder</strong> encodes query and document <strong>separately</strong> into vectors compared by<br />
+cosine — fast, precomputable, the backbone of retrieval/RAG. Contrast the<br />
+<strong>cross-encoder</strong>, which jointly encodes a (query, doc) pair for a relevance score —<br />
+more accurate but O(n) per query, used for <strong>re-ranking</strong> the bi-encoder's top-k.<br />
+Fine-tune bi-encoders with contrastive loss (5.18) on (query, positive, negatives).<br />
+NVIDIA: <strong>NeMo Retriever</strong> embedding + reranking models.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Fine-tuning risks overfitting — how do we stop training at the right time? (5.20)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.20">
+        <div class="verse-title"><strong>Verse 5.20</strong> — Early stopping &amp; patience</div>
+        <div class="meta">Objective 5.3</div>
+        <div class="body">
+<p>Monitor a <strong>validation</strong> metric each eval interval; stop when it fails to improve for<br />
+<code>patience</code> consecutive checks, and restore the <strong>best</strong> checkpoint. Prevents overfitting<br />
+and wasted compute. Levers: <code>patience</code>, <code>min_delta</code> (minimum improvement to count),<br />
+which metric to watch. Pairs with a warmup/cosine schedule (4.32) and HP search<br />
+(4.34, kill weak trials early).</p>
+<pre><code class="language-python">if val_metric &lt; best - min_delta:
+    best, wait = val_metric, 0; save(&quot;best.pt&quot;)
+else:
+    wait += 1
+    if wait &gt;= patience: stop()
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Early stopping fights overfitting — what other signals reveal it? (5.21)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.21">
+        <div class="verse-title"><strong>Verse 5.21</strong> — Overfitting signals &amp; regularization</div>
+        <div class="meta">Objective 5.3</div>
+        <div class="body">
+<p>Signal: training loss keeps falling while <strong>validation loss rises</strong> (diverging curves).<br />
+Regularizers: <strong>weight decay</strong> (L2), <strong>dropout</strong>, <strong>data augmentation</strong>, smaller<br />
+LoRA rank, fewer epochs, and more/diverse data. For LLM fine-tuning, 1–3 epochs on<br />
+instruction data is often enough; more epochs memorize. Label smoothing softens<br />
+over-confidence.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Detecting overfitting requires the right metric — which per phase? (5.22)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.22">
+        <div class="verse-title"><strong>Verse 5.22</strong> — Metric selection per phase</div>
+        <div class="meta">Objective 5.3</div>
+        <div class="body">
+<p>Match the metric to the phase and task:<br />
+- <strong>Training</strong>: loss (CLM/contrastive) for optimization.<br />
+- <strong>Validation</strong>: task metric for model selection/early stopping — perplexity (LM),<br />
+  accuracy/F1 (classification), BLEU/ROUGE (generation), retrieval recall@k<br />
+  (embeddings).<br />
+- <strong>Test</strong>: held-out final report; add human/LLM-judge for open-ended quality (Domain<br />
+  6).</p>
+<p>Never select the model on the test set (leakage, 3.11). Pick a <strong>single</strong> primary<br />
+metric to avoid ambiguous model selection.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Metrics assess quality; a specific failure to fix in fine-tuning is hallucination — how? (5.23)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.23">
+        <div class="verse-title"><strong>Verse 5.23</strong> — Hallucination mitigation via fine-tuning</div>
+        <div class="meta">Objective 5.4</div>
+        <div class="body">
+<p>Fine-tuning levers against hallucination: train on high-quality <strong>grounded</strong> data<br />
+(answers tied to sources), include <strong>"I don't know"</strong> examples so refusal is learned,<br />
+prefer <strong>RAG</strong> for knowledge-heavy tasks over parametric memorization (2.21, 2.23), and<br />
+align with preference methods (DPO) that penalize fabrication. Over-training on narrow<br />
+data can <em>increase</em> confident hallucination — balance with diverse data.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Fine-tuning reduces hallucination probabilistically — what enforces it at runtime? (5.24)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.24">
+        <div class="verse-title"><strong>Verse 5.24</strong> — NeMo Guardrails for hallucination control (xref D10)</div>
+        <div class="meta">Objective 5.4</div>
+        <div class="body">
+<p>Runtime enforcement complements fine-tuning: <strong>NeMo Guardrails</strong> can add a<br />
+<strong>fact-checking / self-check</strong> output rail that verifies a response against retrieved<br />
+sources (or a second LLM call) and blocks/《revises unsupported claims. The guide cites<br />
+integrating <strong>Cleanlab Trustworthy Language Model</strong> in NeMo Guardrails for<br />
+hallucination scoring. Fine-tuning lowers the rate; guardrails catch the residue. Full<br />
+guardrails treatment in 10.09–10.10.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> After mitigation, how do we quantify whether fine-tuning actually helped? (5.25)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.25">
+        <div class="verse-title"><strong>Verse 5.25</strong> — Assessing fine-tuning impact (xref D6)</div>
+        <div class="meta">Objective 5.4</div>
+        <div class="body">
+<p>Measure before/after on a <strong>held-out</strong> set with the primary task metric <strong>and</strong> a<br />
+regression check on general capability (to catch forgetting, 5.26). Use paired<br />
+comparisons, fixed decoding/seeds, and enough samples for significance. Track both the<br />
+target improvement and side-effects (safety, other tasks). Formal evaluation frameworks<br />
+(Ragas, NeMo Evaluator, LLM-as-judge) are Domain 6.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> A key risk when assessing impact is losing prior abilities — what is it and how to prevent it? (5.26)</div>
+    </div>
+
+    <div class="verse-box" id="v-5.26">
+        <div class="verse-title"><strong>Verse 5.26</strong> — Catastrophic forgetting &amp; mitigation</div>
+        <div class="meta">Objective 5.4</div>
+        <div class="body">
+<p>Fine-tuning on a narrow task can overwrite general capabilities — <strong>catastrophic<br />
+forgetting</strong>. Mitigations: <strong>PEFT</strong> (LoRA freezes the base, structurally limiting drift),<br />
+lower LR / fewer epochs, <strong>replay</strong> (mix in general/pretraining data), regularization<br />
+toward the base (EWC, KL to reference — the same mechanism as RLHF's KL penalty, 5.05),<br />
+and multi-task instead of sequential training. PEFT's inherent resistance to forgetting<br />
+is a key reason it's the default.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Fine-tuning done; the next question is rigorous measurement — **Domain 6: Evaluation.**</div>
+    </div>
+
+    <div class="nav">
+        <a href="04-model-optimization.html">← Previous domain</a>
+        <a href="../index.html">All domains</a>
+        <a href="06-evaluation.html">Next domain →</a>
+    </div>
+</body>
+</html>

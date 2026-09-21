@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCP-GENL Domain 8 — Model Deployment</title>
+    <style>
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.45;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #b45309;
+            border-bottom: 2px solid #b45309;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #fff7ed;
+            padding: 10px;
+            border-left: 5px solid #b45309;
+            margin-top: 30px;
+        }
+        .verse-box {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fff;
+            page-break-inside: avoid;
+        }
+        .verse-title {
+            font-size: 1.05em;
+            margin-bottom: 6px;
+        }
+        .meta {
+            text-align: left;
+            color: #777;
+            font-style: italic;
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+        }
+        .body {
+            font-size: 0.95em;
+            line-height: 1.55;
+        }
+        .body p { margin: 0.55em 0; }
+        .body code {
+            background: #f4f4f5;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 0.92em;
+        }
+        .body pre {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.4;
+        }
+        .body pre code {
+            background: none;
+            padding: 0;
+        }
+        .chain {
+            background-color: #f9f9f9;
+            padding: 8px 10px;
+            border-left: 3px solid #27ae60;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .author-note { text-align: center; color: #777; font-style: italic; margin-bottom: 20px; }
+        .summary { background: #fffbeb; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95em; }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 24px 0 8px;
+            font-size: 0.95em;
+        }
+        .nav a { color: #b45309; text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+        @media print {
+            body { max-width: 100%; padding: 0; }
+            .verse-box { border: 1px solid #ccc; }
+            .nav { display: none; }
+        }
+
+    </style>
+</head>
+<body>
+    <h1>NCP-GENL — Domain 8</h1>
+    <p style="text-align: center;">Model Deployment · exam weight 9%</p>
+    <p class="author-note">18 forward-chained verses for recitation.</p>
+    <div class="summary">
+        TTFT/TPOT, Dynamo-Triton, continuous batching, NIM, and Kubernetes serving.
+    </div>
+    <div class="nav">
+        <a href="../index.html">← All domains</a>
+        <a href="09-production-monitoring.html">Next domain →</a>
+    </div>
+    <h2>The 18 Verses</h2>
+    <div class="verse-box" id="v-8.01">
+        <div class="verse-title"><strong>Verse 8.01</strong> — Cost profiles: encoder vs decoder vs enc-dec</div>
+        <div class="meta">Objective 8.1</div>
+        <div class="body">
+<ul>
+<li><strong>Encoder-only</strong>: one forward pass, no autoregression, no KV cache — cheapest,<br />
+  lowest latency (classification/embeddings).</li>
+<li><strong>Decoder-only</strong>: autoregressive — prefill (parallel) then per-token decode (serial) +<br />
+  KV cache; latency scales with output length.</li>
+<li><strong>Encoder-decoder</strong>: full encoder pass + autoregressive decoder + cross-attention —<br />
+  most expensive per request, but the encoder runs once.</li>
+</ul>
+<p>Match model type to the latency/throughput/cost budget (ties to 1.05–1.07).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> For decoders, generation has two distinct phases — what are they? (8.02)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.02">
+        <div class="verse-title"><strong>Verse 8.02</strong> — Prefill vs decode (TTFT, TPOT)</div>
+        <div class="meta">Objective 8.1</div>
+        <div class="body">
+<ul>
+<li><strong>Prefill</strong>: process the whole prompt in parallel, build the KV cache → determines<br />
+<strong>TTFT (Time To First Token)</strong>. Compute-bound (big GEMM over all prompt tokens).</li>
+<li><strong>Decode</strong>: generate one token at a time, each reusing the KV cache → determines<br />
+<strong>TPOT (Time Per Output Token)</strong> / inter-token latency. Memory-bandwidth-bound<br />
+  (loading weights per token at small batch).</li>
+</ul>
+<p>End-to-end latency ≈ TTFT + (output_len − 1) × TPOT. Optimizations differ per phase<br />
+(7.24).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> These phases pull latency and throughput in opposite directions — how do we balance them? (8.03)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.03">
+        <div class="verse-title"><strong>Verse 8.03</strong> — Latency vs throughput tradeoff</div>
+        <div class="meta">Objective 8.1</div>
+        <div class="body">
+<p>Larger batches raise <strong>throughput</strong> (amortize weight loading over more sequences, better<br />
+Tensor Core use) but raise <strong>per-request latency</strong> (queuing + bigger steps). Since decode<br />
+is memory-bandwidth-bound, batching many sequences is nearly free on compute up to a<br />
+point — the key insight enabling continuous batching (8.08). Pick an operating point on<br />
+the latency-throughput curve per SLA; measure with percentiles (6.12).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> To serve this at scale we containerize — what does that pipeline look like? (8.04)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.04">
+        <div class="verse-title"><strong>Verse 8.04</strong> — Containerized inference pipeline</div>
+        <div class="meta">Objective 8.2</div>
+        <div class="body">
+<p>Package the model + runtime + dependencies into a container for reproducible, portable<br />
+deployment. A serving pipeline = preprocess (tokenize) → model (engine) → postprocess<br />
+(detokenize), often as a Triton <strong>ensemble</strong> (8.12). Containers pin CUDA/driver-<br />
+compatible runtimes and enable both <code>docker run</code> and Kubernetes deployment. NVIDIA ships<br />
+prebuilt serving containers on <strong>NGC</strong>.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Where do the model artifacts and container images come from? (8.05)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.05">
+        <div class="verse-title"><strong>Verse 8.05</strong> — NGC images &amp; model artifacts</div>
+        <div class="meta">Objective 8.2</div>
+        <div class="body">
+<p><strong>NGC (NVIDIA GPU Cloud)</strong> is the catalog of GPU-optimized container images (PyTorch,<br />
+Triton/Dynamo-Triton, TensorRT-LLM, NeMo), pretrained models, and Helm charts. Pull with<br />
+<code>docker pull nvcr.io/nvidia/...</code>. Model artifacts (engines, checkpoints, <code>config.pbtxt</code>)<br />
+live in a <strong>model repository</strong> the server mounts. Pin image tags for reproducibility;<br />
+engines are GPU-arch-specific (4.23).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> With container and artifacts, which server serves LLMs and how is it structured? (8.06)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.06">
+        <div class="verse-title"><strong>Verse 8.06</strong> — Dynamo-Triton architecture &amp; model repo</div>
+        <div class="meta">Objective 8.2</div>
+        <div class="body">
+<p><strong>Dynamo-Triton</strong> (formerly <strong>Triton Inference Server</strong>) serves models across<br />
+<strong>backends</strong> (TensorRT-LLM, vLLM, PyTorch, ONNX, Python) behind HTTP/gRPC. A <strong>model<br />
+repository</strong> holds one directory per model with versioned weights/engines and a<br />
+<strong><code>config.pbtxt</code></strong> declaring inputs/outputs, backend, batching, and instance groups.<br />
+Features: dynamic/continuous batching, concurrent execution, ensembles, metrics<br />
+endpoint.</p>
+<blockquote>
+<p><strong>Stale-knowledge flag:</strong> the product was renamed <strong>Triton → Dynamo-Triton</strong>; binary/<br />
+container still <code>tritonserver</code>. VERIFY.</p>
+</blockquote>
+        </div>
+<div class="chain"><strong>Chain →</strong> How does Triton batch incoming requests to raise throughput? (8.07)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.07">
+        <div class="verse-title"><strong>Verse 8.07</strong> — Dynamic batching</div>
+        <div class="meta">Objective 8.2</div>
+        <div class="body">
+<p>Triton's <strong>dynamic batcher</strong> holds incoming requests briefly (up to<br />
+<code>max_queue_delay_microseconds</code>) to combine them into a larger batch before running the<br />
+model — raising throughput/GPU utilization. It batches at the <strong>request</strong> level and waits<br />
+for the batch to <strong>finish together</strong>. Great for fixed-size/non-autoregressive models<br />
+(encoders). For autoregressive LLMs with variable output lengths it's suboptimal (short<br />
+requests wait for long ones) — hence continuous batching (8.08).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Why is dynamic batching not ideal for autoregressive generation? (8.08)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.08">
+        <div class="verse-title"><strong>Verse 8.08</strong> — Continuous (in-flight) batching</div>
+        <div class="meta">Objective 8.2</div>
+        <div class="body">
+<p><strong>Continuous / in-flight batching</strong> (TensorRT-LLM) operates at the <strong>iteration<br />
+(token-step)</strong> level: as soon as one sequence in the batch finishes, its slot is freed<br />
+and a queued request joins immediately — no waiting for the whole batch. This keeps the<br />
+GPU saturated despite highly variable output lengths, dramatically improving throughput<br />
+and latency for LLM serving. Paired with <strong>paged KV cache</strong> for memory efficiency.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> So when do I use dynamic vs continuous batching? (8.09)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.09">
+        <div class="verse-title"><strong>Verse 8.09</strong> — Dynamic vs continuous batching decision</div>
+        <div class="meta">Objective 8.2</div>
+        <div class="body">
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Dynamic batching</th>
+<th>Continuous (in-flight) batching</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Granularity</td>
+<td>request level</td>
+<td>token/iteration level</td>
+</tr>
+<tr>
+<td>Waits for</td>
+<td>batch to finish together</td>
+<td>nothing — slot freed per finished seq</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td>fixed-size / encoders / non-AR</td>
+<td>autoregressive LLM generation</td>
+</tr>
+<tr>
+<td>Backend</td>
+<td>generic Triton</td>
+<td>TensorRT-LLM / vLLM</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule:</strong> LLM text generation → continuous batching. Fixed-shape models (embeddings,<br />
+classifiers) → dynamic batching.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Some models carry state across requests — how are those batched? (8.10)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.10">
+        <div class="verse-title"><strong>Verse 8.10</strong> — Sequence batcher (stateful models)</div>
+        <div class="meta">Objective 8.2</div>
+        <div class="body">
+<p>Triton's <strong>sequence batcher</strong> routes all requests of a <strong>correlation ID</strong> (a session/<br />
+stream) to the <strong>same model instance</strong> in order, preserving per-sequence state across<br />
+calls — what the dynamic batcher does <strong>not</strong> do. Used for stateful/streaming models<br />
+(session-based RNNs, stateful decoding, conversational state held server-side). Manages<br />
+sequence start/end/ready control signals.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Batching aside, how do we run multiple models/instances at once on a GPU? (8.11)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.11">
+        <div class="verse-title"><strong>Verse 8.11</strong> — Concurrent execution &amp; instance groups</div>
+        <div class="meta">Objective 8.2</div>
+        <div class="body">
+<p><code>instance_group</code> in <code>config.pbtxt</code> sets how many <strong>instances</strong> of a model run and on<br />
+which GPUs, enabling <strong>concurrent model execution</strong> — multiple models or multiple copies<br />
+of one model serving in parallel to fill the GPU and hide per-request latency. More<br />
+instances → higher throughput until memory/compute saturate. Combine with dynamic/<br />
+continuous batching.</p>
+<pre><code class="language-protobuf">instance_group [ { count: 2, kind: KIND_GPU, gpus: [0] } ]
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Real pipelines chain preprocess/model/postprocess — how are those composed? (8.12)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.12">
+        <div class="verse-title"><strong>Verse 8.12</strong> — Ensemble / BLS workflows</div>
+        <div class="meta">Objective 8.2</div>
+        <div class="body">
+<ul>
+<li><strong>Ensemble</strong>: a <code>config.pbtxt</code> DAG wiring models together (tokenizer → model →<br />
+  detokenizer) so the server runs the whole pipeline in one request, avoiding<br />
+  client round-trips.</li>
+<li><strong>BLS (Business Logic Scripting)</strong>: a Python backend model that calls other models<br />
+  with <strong>control flow</strong> (loops, conditionals) — for dynamic pipelines (e.g. RAG:<br />
+  embed → retrieve → generate) that a static ensemble DAG can't express.</li>
+</ul>
+        </div>
+<div class="chain"><strong>Chain →</strong> Beyond raw Triton, NVIDIA packages models as microservices — what are those? (8.13)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.13">
+        <div class="verse-title"><strong>Verse 8.13</strong> — NIM microservices overview</div>
+        <div class="meta">Objective 8.2</div>
+        <div class="body">
+<p><strong>NVIDIA NIM (NVIDIA Inference Microservices)</strong> package an optimized model (often<br />
+TensorRT-LLM engine) + Triton + an <strong>OpenAI-compatible REST API</strong> into a single<br />
+container with sensible defaults, auto-selecting the best engine for the detected GPU.<br />
+NIM trades some low-level control for turnkey, production-grade deployment and standard<br />
+APIs. Part of NVIDIA AI Enterprise.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> When do I reach for a NIM vs configuring raw Triton myself? (8.14)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.14">
+        <div class="verse-title"><strong>Verse 8.14</strong> — NIM vs raw Triton decision</div>
+        <div class="meta">Objective 8.2</div>
+        <div class="body">
+<table>
+<thead>
+<tr>
+<th></th>
+<th>NIM</th>
+<th>Raw Dynamo-Triton</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Setup</td>
+<td>turnkey, OpenAI-compatible API</td>
+<td>manual model repo + config.pbtxt</td>
+</tr>
+<tr>
+<td>Optimization</td>
+<td>auto-selects engine per GPU</td>
+<td>you build/tune engines</td>
+</tr>
+<tr>
+<td>Control</td>
+<td>opinionated defaults</td>
+<td>full control (backends, ensembles, BLS)</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td>standard LLMs, fast time-to-prod</td>
+<td>custom pipelines, non-standard models</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule:</strong> NIM for supported models and speed; raw Triton for custom ensembles, unusual<br />
+backends, or fine-grained control.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> However we package it, how do we scale/orchestrate it in production? (8.15)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.15">
+        <div class="verse-title"><strong>Verse 8.15</strong> — Kubernetes serving (HPA, readiness)</div>
+        <div class="meta">Objective 8.3</div>
+        <div class="body">
+<p>Deploy the serving container as a K8s <strong>Deployment</strong> with GPU resource requests,<br />
+<strong>readiness/liveness probes</strong> (Triton's <code>/v2/health/ready</code>) so traffic only routes to<br />
+ready pods, and a <strong>Service</strong>/ingress. Scale with the <strong>Horizontal Pod Autoscaler</strong><br />
+(HPA) on GPU/custom metrics (queue depth, latency). NVIDIA provides Helm charts and the<br />
+GPU Operator. Use rolling updates for zero-downtime (ties to 9.13).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Not everyone runs K8s — what&#x27;s the minimal bare path? (8.16)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.16">
+        <div class="verse-title"><strong>Verse 8.16</strong> — `docker run` serving path</div>
+        <div class="meta">Objective 8.3</div>
+        <div class="body">
+<p>Minimal single-node serving without orchestration:</p>
+<pre><code class="language-bash">docker run --gpus all --rm -p 8000:8000 -p 8001:8001 -p 8002:8002 \
+  -v &quot;$PWD/model_repo&quot;:/models \
+  nvcr.io/nvidia/tritonserver:24.07-py3 \
+  tritonserver --model-repository=/models
+</code></pre>
+<p>Ports: 8000 HTTP, 8001 gRPC, <strong>8002 Prometheus metrics</strong> (9.01). Query with the client<br />
+SDK or curl. This is the reproducible baseline every lab mirrors; K8s (8.15) wraps the<br />
+same container.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Once serving, how do we watch it live? (8.17)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.17">
+        <div class="verse-title"><strong>Verse 8.17</strong> — Live monitoring (Triton metrics endpoint)</div>
+        <div class="meta">Objective 8.3</div>
+        <div class="body">
+<p>Dynamo-Triton exposes <strong>Prometheus metrics</strong> on port <strong>8002</strong>: inference count, request/<br />
+queue/compute latencies, batch sizes, GPU utilization/memory, and (for TRT-LLM)<br />
+LLM-specific counters. Scrape with Prometheus, visualize in Grafana. This is the bridge<br />
+into Production Monitoring (Domain 9). Instrument from day one, not after an incident.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Serving evolves — how do we manage model versions safely? (8.18)</div>
+    </div>
+
+    <div class="verse-box" id="v-8.18">
+        <div class="verse-title"><strong>Verse 8.18</strong> — Model versioning &amp; config.pbtxt</div>
+        <div class="meta">Objective 8.3</div>
+        <div class="body">
+<p>The model repository is <strong>versioned</strong>: numbered subdirectories (<code>1/</code>, <code>2/</code>) under each<br />
+model; <code>config.pbtxt</code>'s <strong>version policy</strong> controls which serve (latest, specific, all).<br />
+This enables safe rollout/rollback and A/B or canary (9.08–9.09) by serving multiple<br />
+versions simultaneously. <code>config.pbtxt</code> also pins backend, batching, instance groups,<br />
+and I/O — the single source of truth for a served model.</p>
+<pre><code class="language-protobuf">version_policy { specific { versions: [2] } }
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Versioning and live metrics lead directly into **Domain 9: Production Monitoring &amp; Reliability.**</div>
+    </div>
+
+    <div class="nav">
+        <a href="07-gpu-acceleration.html">← Previous domain</a>
+        <a href="../index.html">All domains</a>
+        <a href="09-production-monitoring.html">Next domain →</a>
+    </div>
+</body>
+</html>

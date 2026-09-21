@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCP-GENL Domain 7 — GPU Acceleration &amp; Optimization</title>
+    <style>
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.45;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #b45309;
+            border-bottom: 2px solid #b45309;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #fff7ed;
+            padding: 10px;
+            border-left: 5px solid #b45309;
+            margin-top: 30px;
+        }
+        .verse-box {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fff;
+            page-break-inside: avoid;
+        }
+        .verse-title {
+            font-size: 1.05em;
+            margin-bottom: 6px;
+        }
+        .meta {
+            text-align: left;
+            color: #777;
+            font-style: italic;
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+        }
+        .body {
+            font-size: 0.95em;
+            line-height: 1.55;
+        }
+        .body p { margin: 0.55em 0; }
+        .body code {
+            background: #f4f4f5;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 0.92em;
+        }
+        .body pre {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.4;
+        }
+        .body pre code {
+            background: none;
+            padding: 0;
+        }
+        .chain {
+            background-color: #f9f9f9;
+            padding: 8px 10px;
+            border-left: 3px solid #27ae60;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .author-note { text-align: center; color: #777; font-style: italic; margin-bottom: 20px; }
+        .summary { background: #fffbeb; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95em; }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 24px 0 8px;
+            font-size: 0.95em;
+        }
+        .nav a { color: #b45309; text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+        @media print {
+            body { max-width: 100%; padding: 0; }
+            .verse-box { border: 1px solid #ccc; }
+            .nav { display: none; }
+        }
+
+    </style>
+</head>
+<body>
+    <h1>NCP-GENL — Domain 7</h1>
+    <p style="text-align: center;">GPU Acceleration &amp; Optimization · exam weight 14%</p>
+    <p class="author-note">28 forward-chained verses for recitation.</p>
+    <div class="summary">
+        DDP/FSDP/TP/PP, mixed precision, FlashAttention, OOM mitigation, and Nsight profiling.
+    </div>
+    <div class="nav">
+        <a href="../index.html">← All domains</a>
+        <a href="08-model-deployment.html">Next domain →</a>
+    </div>
+    <h2>The 28 Verses</h2>
+    <div class="verse-box" id="v-7.01">
+        <div class="verse-title"><strong>Verse 7.01</strong> — Parallelism taxonomy</div>
+        <div class="meta">Objective 7.1</div>
+        <div class="body">
+<p>Ways to split a training job across GPUs: <strong>data parallel</strong> (replicate model, split<br />
+batch — DDP/FSDP), <strong>tensor parallel</strong> (split individual layers' matrices),<br />
+<strong>pipeline parallel</strong> (split layers into stages), <strong>sequence parallel</strong> (split the<br />
+sequence dimension), <strong>expert parallel</strong> (split MoE experts). They compose into 3D/4D<br />
+parallelism. Choose based on whether the bottleneck is throughput (data) or model size<br />
+(model/tensor/pipeline).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Start with the simplest: how does data parallelism sync gradients? (7.02)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.02">
+        <div class="verse-title"><strong>Verse 7.02</strong> — DDP: gradient all-reduce</div>
+        <div class="meta">Objective 7.1</div>
+        <div class="body">
+<p>Distributed Data Parallel replicates the full model on each GPU, each processes a<br />
+different micro-batch, then <strong>all-reduce</strong> averages gradients across ranks (NCCL<br />
+<strong>ring all-reduce</strong> — bandwidth-optimal). Overlaps gradient communication with the<br />
+backward pass (gradient bucketing). Requires the whole model + optimizer to fit on one<br />
+GPU. Near-linear scaling until communication dominates.</p>
+<pre><code class="language-python">import torch.distributed as dist
+model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank])
+# gradients all-reduced automatically during backward()
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> DDP needs the whole model per GPU — what if it doesn&#x27;t fit? (7.03)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.03">
+        <div class="verse-title"><strong>Verse 7.03</strong> — FSDP / ZeRO stages</div>
+        <div class="meta">Objective 7.1</div>
+        <div class="body">
+<p>Fully Sharded Data Parallel (≈ DeepSpeed <strong>ZeRO</strong>) shards what DDP replicates:<br />
+- <strong>ZeRO-1</strong>: shard optimizer states.<br />
+- <strong>ZeRO-2</strong>: + shard gradients.<br />
+- <strong>ZeRO-3 / FSDP</strong>: + shard parameters — each GPU holds a slice, <strong>all-gathers</strong> the<br />
+  full layer just-in-time for forward/backward, then frees it.</p>
+<p>Trades extra communication for a large memory reduction, fitting models far bigger than<br />
+one GPU while keeping the data-parallel programming model.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Sharding data-parallel still replicates compute per layer — how do we split a single layer&#x27;s math? (7.04)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.04">
+        <div class="verse-title"><strong>Verse 7.04</strong> — Tensor parallelism (Megatron)</div>
+        <div class="meta">Objective 7.1</div>
+        <div class="body">
+<p>Tensor Parallelism (TP) splits <strong>individual weight matrices</strong> across GPUs (intra-layer).<br />
+Megatron splits attention/MLP GEMMs column- then row-wise so each GPU computes a shard<br />
+and an <strong>all-reduce</strong> combines partial results per layer. High communication volume →<br />
+keep TP <strong>within the NVLink domain</strong>; don't span slow inter-node links. Enables layers<br />
+too big for one GPU.</p>
+<blockquote>
+<p><strong>GB200/NVL72 note:</strong> "within a node" traditionally meant ~8 GPUs (NVLink+NVSwitch).<br />
+A <strong>GB200 NVL72</strong> rack is a <strong>single 72-GPU NVLink domain</strong>, so TP (and EP, 7.07) can<br />
+scale to far more GPUs at NVLink bandwidth than the 8-GPU rule assumes — reshaping the<br />
+TP×PP×DP mapping (7.09).</p>
+</blockquote>
+        </div>
+<div class="chain"><strong>Chain →</strong> TP splits within a layer; how do we split *across* layers? (7.05)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.05">
+        <div class="verse-title"><strong>Verse 7.05</strong> — Pipeline parallelism (micro-batches, bubble)</div>
+        <div class="meta">Objective 7.1</div>
+        <div class="body">
+<p>Pipeline Parallelism (PP) splits the model into <strong>stages</strong> of consecutive layers on<br />
+different GPUs; activations pass stage→stage. A naive pipeline idles most GPUs (the<br />
+<strong>bubble</strong>). Splitting the batch into <strong>micro-batches</strong> (GPipe / interleaved 1F1B<br />
+schedules) keeps stages busy and shrinks the bubble. Bubble fraction ≈ <code>(p−1)/(m+p−1)</code><br />
+for <code>p</code> stages, <code>m</code> micro-batches — more micro-batches → smaller bubble. Low comm volume<br />
+(only stage boundaries) → can span nodes.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Attention activations grow with sequence length — how do we parallelize that dimension? (7.06)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.06">
+        <div class="verse-title"><strong>Verse 7.06</strong> — Sequence parallelism</div>
+        <div class="meta">Objective 7.1</div>
+        <div class="body">
+<p>Sequence Parallelism (SP) splits along the <strong>sequence/token dimension</strong>, sharding the<br />
+activations of the normally-replicated ops (LayerNorm, dropout) that Tensor Parallelism<br />
+leaves un-split. Combined with TP (Megatron-SP), it cuts activation memory for long<br />
+sequences without extra compute. For very long context, context/ring-attention variants<br />
+extend this idea across GPUs.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Some models have many experts, not one FFN — how do we parallelize those? (7.07)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.07">
+        <div class="verse-title"><strong>Verse 7.07</strong> — Expert parallelism (MoE)</div>
+        <div class="meta">Objective 7.1</div>
+        <div class="body">
+<p>Mixture-of-Experts replaces the FFN with many <strong>experts</strong>; a router sends each token to<br />
+top-k experts (sparse activation → more params, ~constant FLOPs/token). <strong>Expert<br />
+Parallelism (EP)</strong> places different experts on different GPUs; an <strong>all-to-all</strong> shuffles<br />
+tokens to their expert's GPU and back. Challenge: <strong>load balancing</strong> (add an auxiliary<br />
+balancing loss) so no expert is a bottleneck.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> With all these axes, how do I decide which to use? (7.08)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.08">
+        <div class="verse-title"><strong>Verse 7.08</strong> — Data vs model parallel decision</div>
+        <div class="meta">Objective 7.1</div>
+        <div class="body">
+<ul>
+<li><strong>Fits on one GPU, want speed</strong> → Data Parallel (DDP).</li>
+<li><strong>Optimizer/grad memory too big</strong> → FSDP/ZeRO (still data-parallel model).</li>
+<li><strong>A single layer too big</strong> → Tensor Parallel (keep within a node/NVLink).</li>
+<li><strong>Whole model too big for a node</strong> → Pipeline Parallel across nodes.</li>
+<li><strong>Long sequences</strong> → Sequence Parallel (+ TP).</li>
+<li><strong>MoE</strong> → Expert Parallel.</li>
+</ul>
+<p>Order of preference by comm cost: DP/FSDP ≤ PP (low comm, cross-node) &lt; TP (high comm,<br />
+intra-node) &lt; EP (all-to-all).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Real large-scale training combines these — how? (7.09)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.09">
+        <div class="verse-title"><strong>Verse 7.09</strong> — 3D parallelism composition</div>
+        <div class="meta">Objective 7.1</div>
+        <div class="body">
+<p>Large LLM training composes <strong>TP × PP × DP</strong> (often + SP, + EP): e.g. TP=8 within a<br />
+node (NVLink), PP across nodes, DP across the remaining replicas. Total GPUs =<br />
+TP·PP·DP. Place high-communication TP on the fastest interconnect, PP on slower links,<br />
+DP outermost. NeMo/Megatron-Core expose these as config knobs. Getting the mapping right<br />
+to the topology is the difference between linear and terrible scaling.</p>
+<blockquote>
+<p><strong>GB200/NVL72:</strong> with a 72-GPU NVLink domain (7.04) you can set a much larger TP (and<br />
+EP) that still stays on NVLink, shrinking cross-node PP/DP traffic — retune the mapping<br />
+to the bigger domain rather than defaulting to TP=8.</p>
+</blockquote>
+        </div>
+<div class="chain"><strong>Chain →</strong> Parallelism spreads work; how do we speed up the math on each GPU? (7.10)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.10">
+        <div class="verse-title"><strong>Verse 7.10</strong> — Mixed precision (AMP) &amp; loss scaling</div>
+        <div class="meta">Objective 7.2</div>
+        <div class="body">
+<p>Automatic Mixed Precision runs most ops in FP16/BF16 (fast Tensor Cores, half memory)<br />
+while keeping a master FP32 copy of weights and FP32 accumulations for stability. <strong>FP16<br />
+needs loss scaling</strong>: multiply the loss before backward so small gradients don't<br />
+underflow to zero, then unscale before the optimizer step (dynamic scaler adjusts the<br />
+factor). <strong>BF16 needs no loss scaling</strong> (FP32 exponent range, 4.07).</p>
+<pre><code class="language-python">scaler = torch.cuda.amp.GradScaler()
+with torch.autocast(&quot;cuda&quot;, dtype=torch.float16):
+    loss = model(x).loss
+scaler.scale(loss).backward(); scaler.step(opt); scaler.update()
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Mixed precision feeds Tensor Cores — how do we make sure they&#x27;re actually used? (7.11)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.11">
+        <div class="verse-title"><strong>Verse 7.11</strong> — Tensor Core utilization (dim alignment)</div>
+        <div class="meta">Objective 7.2</div>
+        <div class="body">
+<p>Tensor Cores accelerate matmuls only when dimensions align to their tile sizes:<br />
+GEMM dims (batch, hidden, vocab) should be <strong>multiples of 8</strong> (FP16) or <strong>16</strong> (INT8),<br />
+and larger multiples (64/128) help. Misaligned dims (e.g. vocab 50257, odd hidden) fall<br />
+back to slower paths or waste cycles on padding. Pad vocab/hidden to friendly multiples.<br />
+Verify with Nsight Compute (7.22) that Tensor Core (HMMA/IMMA) pipes are active.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> FP16 vs BF16 both use Tensor Cores — which for training stability? (7.12)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.12">
+        <div class="verse-title"><strong>Verse 7.12</strong> — BF16 vs FP16 training stability</div>
+        <div class="meta">Objective 7.2</div>
+        <div class="body">
+<p>Both are 16-bit Tensor Core formats. <strong>BF16</strong> (1-8-7) has FP32's exponent range → no<br />
+loss scaling, robust to overflow, the default for LLM pretraining on Ampere+.<br />
+<strong>FP16</strong> (1-5-10) has more mantissa precision but a narrow range → needs loss scaling<br />
+and can still overflow on large activations/gradients. Rule: prefer BF16 for training<br />
+stability; use FP16 only where required.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> On H100 there&#x27;s an 8-bit training path — what is it? (7.13)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.13">
+        <div class="verse-title"><strong>Verse 7.13</strong> — Transformer Engine FP8 recipes  `[H100-ONLY]`</div>
+        <div class="meta">Objective 7.2</div>
+        <div class="body">
+<p><strong>Transformer Engine (TE)</strong> provides FP8 training/inference on <strong>Hopper+</strong>: FP8 GEMMs<br />
+(E4M3 fwd, E5M2 grads, 4.06) with <strong>per-tensor scaling factors</strong> maintained via a<br />
+<strong>delayed-scaling</strong> recipe (track a rolling window of amax to set scales). Wrap layers<br />
+in <code>te.Linear</code>/<code>te.TransformerLayer</code> under an <code>fp8_autocast</code>. Big speedup + memory cut on<br />
+H100 with near-BF16 accuracy.</p>
+<blockquote>
+<p><strong>GB200/Blackwell upgrade:</strong> the <strong>2nd-gen Transformer Engine</strong> (<code>sm_100</code>) adds <strong>FP4<br />
+(NVFP4) training/inference</strong> with micro-block scaling (4.08) — finer-grained than<br />
+Hopper's per-tensor delayed scaling — for even higher throughput and smaller memory.<br />
+<strong>A100 fallback:</strong> use BF16 AMP (7.10/7.12) — same mixed-precision concept, no FP8/FP4<br />
+units on Ampere.</p>
+</blockquote>
+<pre><code class="language-python">import transformer_engine.pytorch as te
+from transformer_engine.common.recipe import DelayedScaling
+with te.fp8_autocast(enabled=True, fp8_recipe=DelayedScaling()):
+    out = te_model(x)
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Precision aside, what dominates memory and how do we manage it? (7.14)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.14">
+        <div class="verse-title"><strong>Verse 7.14</strong> — Batch / memory management (activations)</div>
+        <div class="meta">Objective 7.2</div>
+        <div class="body">
+<p>Training memory = weights + gradients + optimizer states + <strong>activations</strong>. Activation<br />
+memory scales with <strong>batch × sequence × hidden × layers</strong> and often dominates at long<br />
+context. Levers: reduce micro-batch (+ gradient accumulation, 7.15), gradient/activation<br />
+checkpointing (7.16), sequence parallelism (7.06), and lower precision. Increasing batch<br />
+raises throughput and activation memory together — tune to fill the GPU without OOM.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> If we need a big effective batch but memory is tight, how? (7.15)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.15">
+        <div class="verse-title"><strong>Verse 7.15</strong> — Gradient accumulation (effective batch)</div>
+        <div class="meta">Objective 7.3</div>
+        <div class="body">
+<p>Accumulate gradients over <code>k</code> micro-batches before an optimizer step to simulate a<br />
+<code>k×</code> larger batch without the memory cost:</p>
+<p><code>effective_batch = micro_batch × k × data_parallel_world_size</code></p>
+<p>Do <strong>not</strong> zero grads between micro-steps; step + zero after <code>k</code>. Divide loss by <code>k</code> so<br />
+the gradient magnitude matches a true large batch. Trades more forward/backward passes<br />
+per update for memory headroom (pairs with the linear scaling rule, 4.33).</p>
+<pre><code class="language-python">for i, batch in enumerate(loader):
+    loss = model(**batch).loss / k
+    loss.backward()
+    if (i + 1) % k == 0:
+        opt.step(); opt.zero_grad()
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Accumulation stores activations per micro-batch — how do we cut *that* memory? (7.16)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.16">
+        <div class="verse-title"><strong>Verse 7.16</strong> — Gradient (activation) checkpointing</div>
+        <div class="meta">Objective 7.3</div>
+        <div class="body">
+<p>Instead of storing every layer's activations for the backward pass, store only a few<br />
+<strong>checkpoints</strong> and <strong>recompute</strong> the rest during backward. Cuts activation memory from<br />
+O(L) toward O(√L) at the cost of ~1 extra forward (~30% more compute). Enables larger<br />
+batches/models on limited memory — the standard OOM remedy alongside gradient<br />
+accumulation.</p>
+<pre><code class="language-python">from torch.utils.checkpoint import checkpoint
+out = checkpoint(layer, x)   # recompute activations in backward
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Memory managed; the attention GEMM is the hot compute — how is it optimized? (7.17)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.17">
+        <div class="verse-title"><strong>Verse 7.17</strong> — Attention GEMM &amp; FlashAttention</div>
+        <div class="meta">Objective 7.3</div>
+        <div class="body">
+<p>Naive attention materializes the <code>T×T</code> score matrix in HBM → memory-bandwidth-bound and<br />
+O(T²) memory. <strong>FlashAttention</strong> fuses the softmax·(QKᵀ)·V into one kernel using<br />
+<strong>tiling</strong> + <strong>online softmax</strong>, keeping intermediates in SRAM and never writing the full<br />
+matrix — O(T) memory, far higher throughput, IO-aware. It's the reason long context is<br />
+feasible. NVIDIA ships fused attention via cuDNN / Transformer Engine.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> With tensor parallelism, how is the multi-head attention GEMM split across GPUs? (7.18)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.18">
+        <div class="verse-title"><strong>Verse 7.18</strong> — MHA GEMM distribution across TP</div>
+        <div class="meta">Objective 7.3</div>
+        <div class="body">
+<p>In Megatron tensor parallelism, attention is split <strong>by heads</strong>: each GPU owns a subset<br />
+of heads and computes their QKV projections and attention independently (column-parallel<br />
+QKV), then the output projection is <strong>row-parallel</strong> with a single all-reduce to combine.<br />
+Because heads are independent (1.03), this splits cleanly with communication only at the<br />
+output projection. Keep head count divisible by the TP size.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Knowing all this, how do we compute whether a model+batch even fits? (7.19)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.19">
+        <div class="verse-title"><strong>Verse 7.19</strong> — Training memory formula</div>
+        <div class="meta">Objective 7.2</div>
+        <div class="body">
+<p>Approximate GPU memory for training (mixed precision, Adam):<br />
+- <strong>Weights</strong>: <code>P × 2</code> bytes (BF16).<br />
+- <strong>Gradients</strong>: <code>P × 2</code> bytes.<br />
+- <strong>Optimizer (Adam)</strong>: FP32 master + m + v ≈ <code>P × 12</code> bytes.<br />
+- <strong>Activations</strong>: ∝ batch × seq × hidden × layers (dominant at long context;<br />
+  checkpointing cuts it).</p>
+<p>Rule of thumb: full Adam training ≈ <strong>~16–20 bytes/param</strong> before activations, so a 7B<br />
+model needs ~112–140 GB → why FSDP/parallelism/PEFT. Inference adds the <strong>KV cache</strong><br />
+(4.26) instead of optimizer states.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> When this budget is exceeded, what happens and how do we diagnose it? (7.20)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.20">
+        <div class="verse-title"><strong>Verse 7.20</strong> — OOM diagnosis &amp; mitigation</div>
+        <div class="meta">Objective 7.4</div>
+        <div class="body">
+<p>CUDA OOM = requested allocation exceeds free VRAM (watch <strong>fragmentation</strong> too).<br />
+Mitigations, cheapest first: reduce micro-batch, <strong>gradient accumulation</strong> (7.15),<br />
+<strong>activation checkpointing</strong> (7.16), lower precision (BF16/FP8), shorter <code>max_seq_len</code>,<br />
+<strong>FSDP/ZeRO</strong> (7.03), CPU/NVMe offload, <code>PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True</code><br />
+for fragmentation. Diagnose with <code>torch.cuda.memory_summary()</code> and the memory snapshot/<br />
+profiler.</p>
+<blockquote>
+<p><strong>GB200/Grace-Blackwell:</strong> the Grace CPU and Blackwell GPU share <strong>coherent, NVLink-C2C<br />
+memory</strong>, so CPU offload is far cheaper than PCIe offload — large KV cache / optimizer<br />
+state can spill to Grace LPDDR with much less penalty, and FP4 weights (4.08) further<br />
+cut the footprint.</p>
+</blockquote>
+        </div>
+<div class="chain"><strong>Chain →</strong> OOM is one bottleneck; how do we profile the whole timeline to find others? (7.21)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.21">
+        <div class="verse-title"><strong>Verse 7.21</strong> — Nsight Systems (timeline, system-level)</div>
+        <div class="meta">Objective 7.4</div>
+        <div class="body">
+<p><strong>Nsight Systems (<code>nsys</code>)</strong> is the <strong>system-wide timeline</strong> profiler: CPU/GPU activity,<br />
+CUDA API calls, kernel launches, memcpy, NCCL comm, and gaps. Use it to find <em>coarse</em><br />
+problems: GPU idle bubbles, CPU-bound data loading, poor compute/comm overlap, launch<br />
+gaps, host-device sync stalls. Answers "where is time going across the system." Not for<br />
+per-kernel internals — that's Nsight Compute.</p>
+<pre><code class="language-bash">nsys profile -o report python train.py    # then open in Nsight Systems UI
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Once you find a slow kernel, how do you look *inside* it? (7.22)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.22">
+        <div class="verse-title"><strong>Verse 7.22</strong> — Nsight Compute (kernel-level)</div>
+        <div class="meta">Objective 7.4</div>
+        <div class="body">
+<p><strong>Nsight Compute (<code>ncu</code>)</strong> is the <strong>per-kernel</strong> profiler: occupancy, memory vs compute<br />
+throughput, warp stalls, register/shared-memory usage, Tensor Core (HMMA/IMMA)<br />
+utilization, and a <strong>roofline</strong> chart. Use it after Nsight Systems localizes a hot<br />
+kernel, to answer "why is <em>this</em> kernel slow." Division of labor: <strong>Systems = timeline/<br />
+where; Compute = kernel/why.</strong></p>
+<pre><code class="language-bash">ncu --set full -o krep python train.py
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Nsight reports occupancy — what does low occupancy indicate? (7.23)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.23">
+        <div class="verse-title"><strong>Verse 7.23</strong> — Kernel underutilization / low occupancy</div>
+        <div class="meta">Objective 7.4</div>
+        <div class="body">
+<p><strong>Occupancy</strong> = active warps / max warps per SM. Low occupancy or low Tensor Core<br />
+utilization signals underutilization, from: too-small batch/dims (not enough parallel<br />
+work), register/shared-memory pressure limiting resident warps, memory-bound stalls, or<br />
+misaligned dims skipping Tensor Cores (7.11). Fixes: larger batch, kernel fusion, fix<br />
+alignment, reduce register spilling. Note: high occupancy is not the goal in itself —<br />
+sufficient occupancy to hide latency is.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Is a slow kernel limited by compute or memory? How do we tell? (7.24)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.24">
+        <div class="verse-title"><strong>Verse 7.24</strong> — Compute-bound vs memory-bound (roofline)</div>
+        <div class="meta">Objective 7.4</div>
+        <div class="body">
+<p><strong>Arithmetic intensity</strong> = FLOPs / bytes moved. The <strong>roofline</strong> plots achievable<br />
+FLOP/s vs intensity: low intensity → <strong>memory-bound</strong> (limited by HBM bandwidth); high<br />
+intensity → <strong>compute-bound</strong> (limited by peak FLOP/s). LLM <strong>decode</strong> (batch 1, one<br />
+token) is memory-bound (weight loading dominates) → weight-only quant helps (4.04);<br />
+<strong>prefill</strong>/large-batch GEMMs are compute-bound → low-precision compute (FP8/INT8) helps.<br />
+Diagnose with Nsight Compute's roofline.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Multi-GPU adds communication as a bottleneck — how do we spot it? (7.25)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.25">
+        <div class="verse-title"><strong>Verse 7.25</strong> — NCCL communication bottlenecks &amp; overlap</div>
+        <div class="meta">Objective 7.4</div>
+        <div class="body">
+<p>At scale, collective communication (all-reduce, all-gather, all-to-all) can dominate.<br />
+<strong>NCCL</strong> implements bandwidth-optimal collectives over NVLink/PCIe/InfiniBand. Symptoms<br />
+in Nsight Systems: GPUs idle waiting on NCCL. Remedies: <strong>overlap</strong> comm with compute<br />
+(DDP gradient bucketing, FSDP prefetch), place high-comm parallelism (TP) on NVLink<br />
+within a node (7.04/7.09), gradient compression, and larger fused buffers. Watch for a<br />
+straggler GPU serializing the collective.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Overlap needs async execution — what primitive enables it? (7.26)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.26">
+        <div class="verse-title"><strong>Verse 7.26</strong> — CUDA streams &amp; async overlap</div>
+        <div class="meta">Objective 7.4</div>
+        <div class="body">
+<p>A <strong>CUDA stream</strong> is an ordered queue of GPU work; operations in <strong>different</strong> streams<br />
+can run concurrently. This enables overlapping compute with H2D/D2H copies (use <strong>pinned<br />
+memory</strong> + <code>non_blocking=True</code>) and with NCCL comm. The default stream serializes;<br />
+frameworks use multiple streams internally. Missing overlap (everything on one stream,<br />
+blocking copies) shows as timeline gaps in Nsight Systems.</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> Kernel *launch* overhead can also bottleneck — how do we cut it? (7.27)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.27">
+        <div class="verse-title"><strong>Verse 7.27</strong> — torch.compile / CUDA graphs (launch overhead)</div>
+        <div class="meta">Objective 7.4</div>
+        <div class="body">
+<p>Many tiny kernels make <strong>launch overhead</strong> (CPU dispatching each kernel) the<br />
+bottleneck — common in decode with small batches. <strong>CUDA Graphs</strong> capture a sequence of<br />
+launches once and replay them as a single unit, removing per-launch CPU cost.<br />
+<strong><code>torch.compile</code></strong> fuses ops and can use CUDA graphs automatically. Big wins for<br />
+latency-bound, launch-heavy workloads (small-batch inference).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> All these tools serve one loop — what is the disciplined optimization workflow? (7.28)</div>
+    </div>
+
+    <div class="verse-box" id="v-7.28">
+        <div class="verse-title"><strong>Verse 7.28</strong> — Profiling-driven optimization loop</div>
+        <div class="meta">Objective 7.4</div>
+        <div class="body">
+<p>Disciplined loop (NVIDIA APOD: Assess, Parallelize, Optimize, Deploy):<br />
+1. <strong>Assess</strong> — profile with Nsight Systems to find the biggest bottleneck (never<br />
+   optimize by guessing).<br />
+2. Classify it: GPU-idle (data/comm), memory-bound, compute-bound, launch-bound.<br />
+3. Apply the matching fix (7.20–7.27).<br />
+4. <strong>Re-profile</strong> to confirm and find the next bottleneck; iterate.</p>
+<p>Measure one change at a time; optimize the dominant cost first (Amdahl).</p>
+        </div>
+<div class="chain"><strong>Chain →</strong> An optimized, trained model must now be served in production — **Domain 8: Model Deployment.**</div>
+    </div>
+
+    <div class="nav">
+        <a href="06-evaluation.html">← Previous domain</a>
+        <a href="../index.html">All domains</a>
+        <a href="08-model-deployment.html">Next domain →</a>
+    </div>
+</body>
+</html>

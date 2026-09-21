@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCP-GENL Domain 1 — LLM Architecture</title>
+    <style>
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.45;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #b45309;
+            border-bottom: 2px solid #b45309;
+            padding-bottom: 10px;
+        }
+        h2 {
+            background-color: #fff7ed;
+            padding: 10px;
+            border-left: 5px solid #b45309;
+            margin-top: 30px;
+        }
+        .verse-box {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #fff;
+            page-break-inside: avoid;
+        }
+        .verse-title {
+            font-size: 1.05em;
+            margin-bottom: 6px;
+        }
+        .meta {
+            text-align: left;
+            color: #777;
+            font-style: italic;
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+        }
+        .body {
+            font-size: 0.95em;
+            line-height: 1.55;
+        }
+        .body p { margin: 0.55em 0; }
+        .body code {
+            background: #f4f4f5;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 0.92em;
+        }
+        .body pre {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.4;
+        }
+        .body pre code {
+            background: none;
+            padding: 0;
+        }
+        .chain {
+            background-color: #f9f9f9;
+            padding: 8px 10px;
+            border-left: 3px solid #27ae60;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .author-note { text-align: center; color: #777; font-style: italic; margin-bottom: 20px; }
+        .summary { background: #fffbeb; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 0.95em; }
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 24px 0 8px;
+            font-size: 0.95em;
+        }
+        .nav a { color: #b45309; text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+        @media print {
+            body { max-width: 100%; padding: 0; }
+            .verse-box { border: 1px solid #ccc; }
+            .nav { display: none; }
+        }
+
+    </style>
+</head>
+<body>
+    <h1>NCP-GENL — Domain 1</h1>
+    <p style="text-align: center;">LLM Architecture · exam weight 6%</p>
+    <p class="author-note">12 forward-chained verses for recitation.</p>
+    <div class="summary">
+        Transformer blocks, attention, positional encodings, encoder/decoder stacks, embeddings, and sampling.
+    </div>
+    <div class="nav">
+        <a href="../index.html">← All domains</a>
+        <a href="02-prompt-engineering.html">Next domain →</a>
+    </div>
+    <h2>The 12 Verses</h2>
+    <div class="verse-box" id="v-1.01">
+        <div class="verse-title"><strong>Verse 1.01</strong> — Transformer block anatomy</div>
+        <div class="meta">Objective 1.2</div>
+        <div class="body">
+<p>A transformer block is a <strong>residual stream</strong> of width <code>d_model</code> with two sublayers,<br />
+each wrapped as <code>x = x + Sublayer(Norm(x))</code> (<strong>pre-LN</strong>, the modern default). The<br />
+original paper used <strong>post-LN</strong> <code>Norm(x + Sublayer(x))</code>, which needs LR warmup to stay<br />
+stable. Sublayer 1 = multi-head self-attention; sublayer 2 = position-wise FFN (two<br />
+linear layers + nonlinearity, inner dim ≈ <code>4·d_model</code>, GELU/SwiGLU). The residual<br />
+stream is the "highway" every sublayer reads from and writes to; its width <code>d_model</code><br />
+is the model's information bandwidth.</p>
+<pre><code class="language-python"># pre-LN block (schematic)
+def block(x, attn, ffn, ln1, ln2):
+    x = x + attn(ln1(x))     # sublayer 1: mixes tokens
+    x = x + ffn(ln2(x))      # sublayer 2: per-token transform
+    return x
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Everything hinges on what the attention sublayer computes — so what is inside it? (1.02)</div>
+    </div>
+
+    <div class="verse-box" id="v-1.02">
+        <div class="verse-title"><strong>Verse 1.02</strong> — Scaled dot-product attention</div>
+        <div class="meta">Objective 1.2</div>
+        <div class="body">
+<p>Attention mixes tokens by content similarity:</p>
+<p>$$\text{Attention}(Q,K,V)=\text{softmax}!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V$$</p>
+<p>with <code>Q=XW_Q</code>, <code>K=XW_K</code>, <code>V=XW_V</code>. The <code>1/√d_k</code> scale exists because for<br />
+unit-variance <code>q,k</code> the dot product <code>q·k</code> has variance <code>d_k</code>; <strong>without scaling</strong>,<br />
+logits grow with <code>d_k</code>, softmax saturates toward one-hot, and gradients through it<br />
+vanish. Dividing by <code>√d_k</code> restores unit-variance logits.</p>
+<pre><code class="language-python">import torch, math
+def attention(Q, K, V, mask=None):           # Q,K,V: [B, h, T, d_k]
+    scores = Q @ K.transpose(-2, -1) / math.sqrt(Q.size(-1))
+    if mask is not None:
+        scores = scores.masked_fill(mask == 0, float(&quot;-inf&quot;))
+    return torch.softmax(scores, dim=-1) @ V
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> One head attends in only one subspace — how do we attend in several at once? (1.03)</div>
+    </div>
+
+    <div class="verse-box" id="v-1.03">
+        <div class="verse-title"><strong>Verse 1.03</strong> — Multi-head attention</div>
+        <div class="meta">Objective 1.2</div>
+        <div class="body">
+<p>Split into <code>h</code> heads of width <code>d_k = d_model/h</code>, attend independently, concatenate,<br />
+project with <code>W_O</code>:</p>
+<p>$$\text{MHA}(X)=\text{Concat}(\text{head}_1,\dots,\text{head}_h)W_O,\quad<br />
+\text{head}_i=\text{Attention}(XW_Q^i,XW_K^i,XW_V^i)$$</p>
+<p>Total parameter/FLOP cost ≈ one full-width head, but heads <strong>specialize</strong> (syntax,<br />
+coreference, positional patterns). GQA/MQA later share K,V across heads to shrink the<br />
+KV cache (see 4.26).</p>
+<pre><code class="language-python">def split_heads(x, h):        # [B, T, d_model] -&gt; [B, h, T, d_k]
+    B, T, d = x.shape
+    return x.view(B, T, h, d // h).transpose(1, 2)
+# merge is the inverse, then @ W_O
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Attention is permutation-invariant — reorder tokens, output set is unchanged. How does the model know order? (1.04)</div>
+    </div>
+
+    <div class="verse-box" id="v-1.04">
+        <div class="verse-title"><strong>Verse 1.04</strong> — Positional encoding</div>
+        <div class="meta">Objective 1.2</div>
+        <div class="body">
+<p>Order is injected explicitly.</p>
+<ul>
+<li><strong>Sinusoidal</strong> (fixed, additive): <code>PE(pos,2i)=sin(pos/10000^{2i/d})</code>,<br />
+<code>PE(pos,2i+1)=cos(...)</code>. Extrapolates modestly.</li>
+<li><strong>Learned absolute</strong>: trainable position table; <strong>cannot extrapolate</strong> past trained<br />
+  length.</li>
+<li><strong>RoPE</strong> (rotary): rotates <code>Q,K</code> by a position-dependent angle so the dot product<br />
+  depends only on the <strong>relative</strong> offset; strong extrapolation; default in modern<br />
+  decoders (Llama, Qwen).</li>
+<li><strong>ALiBi</strong>: adds a <strong>linear distance penalty</strong> to attention logits; cheapest, strong<br />
+  extrapolation.</li>
+</ul>
+<pre><code class="language-python">import torch
+def sinusoidal(T, d):
+    pos = torch.arange(T)[:, None]
+    i   = torch.arange(0, d, 2)[None, :]
+    ang = pos / (10000 ** (i / d))
+    pe = torch.zeros(T, d); pe[:, 0::2] = ang.sin(); pe[:, 1::2] = ang.cos()
+    return pe
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> These blocks stack identically, but encoder and decoder differ in the attention mask. What is an encoder? (1.05)</div>
+    </div>
+
+    <div class="verse-box" id="v-1.05">
+        <div class="verse-title"><strong>Verse 1.05</strong> — Encoder stack (bidirectional)</div>
+        <div class="meta">Objective 1.1</div>
+        <div class="body">
+<p>An encoder applies <strong>unmasked</strong> self-attention: every position attends to all<br />
+positions, left and right. Output is a contextual representation of the <em>whole</em><br />
+input — ideal for understanding tasks: classification, NER, retrieval embeddings<br />
+(BERT, RoBERTa). It <strong>cannot generate autoregressively</strong> because it "sees the<br />
+future." Trained with masked language modeling (see 4.28).</p>
+<pre><code class="language-python"># no causal mask: full [T, T] attention allowed
+attn_mask = None            # only padding mask applied, never a causal triangle
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> So what do we use when we must generate text token by token? (1.06)</div>
+    </div>
+
+    <div class="verse-box" id="v-1.06">
+        <div class="verse-title"><strong>Verse 1.06</strong> — Decoder stack (causal)</div>
+        <div class="meta">Objective 1.1</div>
+        <div class="body">
+<p>A decoder applies a <strong>causal mask</strong>: position <code>t</code> attends only to <code>≤ t</code>. Implemented<br />
+by adding <code>-∞</code> to the upper triangle of <code>QKᵀ/√d_k</code> before softmax, forcing those<br />
+weights to 0. This enforces autoregression <code>p(x_t | x_{&lt;t})</code>, enabling generation<br />
+(GPT family). At inference, past keys/values are cached (<strong>KV cache</strong>, see 4.26) so<br />
+each new token costs O(seq) not O(seq²).</p>
+<pre><code class="language-python">import torch
+def causal_mask(T):
+    return torch.tril(torch.ones(T, T)).bool()   # lower-triangular True = allowed
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> What about tasks that must both fully understand an input and generate a different output? (1.07)</div>
+    </div>
+
+    <div class="verse-box" id="v-1.07">
+        <div class="verse-title"><strong>Verse 1.07</strong> — Encoder-decoder (cross-attention)</div>
+        <div class="meta">Objective 1.1</div>
+        <div class="body">
+<p>Seq2seq models (T5, BART, original Transformer) pair a <strong>bidirectional encoder</strong> with<br />
+a <strong>causal decoder</strong> joined by <strong>cross-attention</strong>: the decoder supplies <code>Q</code>, the<br />
+encoder's final states supply <code>K,V</code>. Decoding is thus conditioned on a<br />
+fully-contextualized source — the natural fit for translation and summarization where<br />
+source/target lengths and vocabularies differ. Cost: you pay for both stacks plus<br />
+cross-attention.</p>
+<pre><code class="language-python"># decoder layer has THREE attention calls:
+h = h + self_attn(ln1(h), mask=causal)          # 1: causal self-attn
+h = h + cross_attn(ln2(h), kv=encoder_states)   # 2: Q=decoder, K,V=encoder
+h = h + ffn(ln3(h))                             # 3: FFN
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> All three architectures emit hidden states we call embeddings — but what is an embedding, precisely? (1.08)</div>
+    </div>
+
+    <div class="verse-box" id="v-1.08">
+        <div class="verse-title"><strong>Verse 1.08</strong> — The concept of embeddings</div>
+        <div class="meta"></div>
+        <div class="body">
+<p><strong>Objectives:</strong> 1.6, (1.8 support)</p>
+<p>An embedding maps a discrete token id to a dense vector via lookup in the embedding<br />
+matrix <code>E ∈ ℝ^{V×d}</code> (V = vocab size). Training arranges these vectors so geometric<br />
+proximity ≈ semantic/functional similarity. <strong>Weight tying</strong> reuses <code>E</code> (transposed)<br />
+as the output projection to logits, cutting parameters and coupling input/output<br />
+representations. "Embedding" also names any later hidden state used as a<br />
+sentence/document vector.</p>
+<pre><code class="language-python">import torch.nn as nn
+emb = nn.Embedding(V, d)          # lookup table E: [V, d]
+lm_head = nn.Linear(d, V, bias=False)
+lm_head.weight = emb.weight        # weight tying (input emb == output projection)
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> How do we actually pull a usable sentence embedding out of an encoder? (1.09)</div>
+    </div>
+
+    <div class="verse-box" id="v-1.09">
+        <div class="verse-title"><strong>Verse 1.09</strong> — Extract embeddings from an encoder</div>
+        <div class="meta"></div>
+        <div class="body">
+<p><strong>Objectives:</strong> 1.3, 1.6</p>
+<p>Two standard poolings over the encoder's last hidden state: the <code>[CLS]</code> token vector,<br />
+or <strong>masked mean pooling</strong> over token vectors. Mean pooling usually wins unless the<br />
+model was fine-tuned to make <code>[CLS]</code> a sentence representation (Sentence-Transformers<br />
+exist precisely for this reason).</p>
+<pre><code class="language-python">from transformers import AutoTokenizer, AutoModel
+import torch
+tok = AutoTokenizer.from_pretrained(&quot;bert-base-uncased&quot;)
+enc = AutoModel.from_pretrained(&quot;bert-base-uncased&quot;).eval().cuda()
+b = tok([&quot;a cat sat&quot;, &quot;a dog ran&quot;], padding=True, return_tensors=&quot;pt&quot;).to(&quot;cuda&quot;)
+with torch.no_grad():
+    h = enc(**b).last_hidden_state              # [B, T, d]
+m = b.attention_mask.unsqueeze(-1)              # [B, T, 1]
+mean_emb = (h * m).sum(1) / m.sum(1)            # masked mean pooling -&gt; [B, d]
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Decoders have no `[CLS]` and attend only leftward — how do we get an embedding from one? (1.10)</div>
+    </div>
+
+    <div class="verse-box" id="v-1.10">
+        <div class="verse-title"><strong>Verse 1.10</strong> — Extract embeddings from a decoder</div>
+        <div class="meta">Objective 1.3</div>
+        <div class="body">
+<p>Use the <strong>last non-pad token's</strong> final hidden state — under causal masking it is the<br />
+only position that has attended to the entire sequence. This requires <strong>left padding</strong><br />
+so the true last token sits at index <code>-1</code>; right padding returns a pad vector and<br />
+collapses your embeddings.</p>
+<pre><code class="language-python">from transformers import AutoTokenizer, AutoModel
+import torch
+tok = AutoTokenizer.from_pretrained(&quot;gpt2&quot;); tok.padding_side = &quot;left&quot;
+tok.pad_token = tok.eos_token
+dec = AutoModel.from_pretrained(&quot;gpt2&quot;).eval().cuda()
+b = tok([&quot;a cat sat&quot;, &quot;a dog ran too&quot;], padding=True, return_tensors=&quot;pt&quot;).to(&quot;cuda&quot;)
+with torch.no_grad():
+    h = dec(**b).last_hidden_state              # [B, T, d]
+last_emb = h[:, -1, :]                          # left-padded =&gt; real last token
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Now the decoder can produce hidden states and logits — how do we turn logits into the next token? (1.11)</div>
+    </div>
+
+    <div class="verse-box" id="v-1.11">
+        <div class="verse-title"><strong>Verse 1.11</strong> — Sampling I: greedy, beam, temperature</div>
+        <div class="meta"></div>
+        <div class="body">
+<p><strong>Objectives:</strong> 1.4, 1.5</p>
+<p>From logits <code>z</code>, <code>p = softmax(z)</code>.<br />
+- <strong>Greedy</strong> = <code>argmax</code>; deterministic, myopic, repetitive.<br />
+- <strong>Beam search</strong> keeps the <code>b</code> highest-probability <em>sequences</em> (summed, usually<br />
+  length-normalized log-probs); maximizes likelihood — good for constrained tasks<br />
+  (translation), bad for open-ended text (bland, degenerate loops).<br />
+- <strong>Temperature</strong> rescales before softmax: <code>p_i = softmax(z_i/T)</code>. <code>T&lt;1</code> sharpens<br />
+  (greedier), <code>T&gt;1</code> flattens (more random), <code>T→0</code> ≡ greedy (implementations<br />
+  special-case it; literal <code>z/0</code> is undefined).</p>
+<pre><code class="language-python">import torch
+def sample_temp(logits, T=0.7):
+    p = torch.softmax(logits / max(T, 1e-6), dim=-1)
+    return torch.multinomial(p, 1)
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> Temperature reshapes the *whole* distribution — how do we instead cut off the unreliable tail? (1.12)</div>
+    </div>
+
+    <div class="verse-box" id="v-1.12">
+        <div class="verse-title"><strong>Verse 1.12</strong> — Sampling II: top-k, top-p (nucleus), repetition penalty</div>
+        <div class="meta"></div>
+        <div class="body">
+<p><strong>Objectives:</strong> 1.4, 1.5</p>
+<ul>
+<li><strong>Top-k</strong>: keep the <code>k</code> highest-prob tokens, renormalize, sample — <strong>fixed count</strong><br />
+  regardless of confidence.</li>
+<li><strong>Top-p / nucleus</strong>: keep the smallest set whose cumulative probability ≥ <code>p</code>, then<br />
+  sample — an <strong>adaptive count</strong> that stays small when confident and widens when<br />
+  uncertain.</li>
+<li><strong>Repetition penalty</strong>: divide logits of already-generated tokens by <code>r&gt;1</code> to<br />
+  suppress loops.</li>
+</ul>
+<p>Common recipe: <code>temperature≈0.7, top_p≈0.9</code>.</p>
+<pre><code class="language-python">import torch
+def top_p(logits, p=0.9):
+    s, idx = torch.sort(logits, descending=True)
+    cum = torch.softmax(s, -1).cumsum(-1)
+    s[cum &gt; p] = float(&quot;-inf&quot;)            # drop the tail beyond nucleus
+    return idx[torch.multinomial(torch.softmax(s, -1), 1)]
+</code></pre>
+        </div>
+<div class="chain"><strong>Chain →</strong> These are exactly the knobs a serving stack exposes — which sets up controlling model behavior from the prompt/decoding layer: **Domain 2**.</div>
+    </div>
+
+    <div class="nav">
+        <span></span>
+        <a href="../index.html">All domains</a>
+        <a href="02-prompt-engineering.html">Next domain →</a>
+    </div>
+</body>
+</html>
