@@ -1,0 +1,10 @@
+# Stage 01 — Prometheus scrape config targeting Triton (:8002) and DCGM (:9400).
+global:
+  scrape_interval: 5s
+scrape_configs:
+  - job_name: triton
+    static_configs:
+      - targets: ["host.docker.internal:8002"]   # Triton metrics endpoint
+  - job_name: dcgm
+    static_configs:
+      - targets: ["host.docker.internal:9400"]    # DCGM-Exporter GPU telemetry

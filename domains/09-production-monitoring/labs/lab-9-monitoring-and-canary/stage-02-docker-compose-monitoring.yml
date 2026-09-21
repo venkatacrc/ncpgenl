@@ -1,0 +1,15 @@
+# Stage 02 — bring up Prometheus + Grafana. `docker compose -f this up -d`
+services:
+  prometheus:
+    image: prom/prometheus            # VERIFY tag
+    ports: ["9090:9090"]
+    volumes:
+      - ./stage-01-prometheus-config.yml:/etc/prometheus/prometheus.yml
+    extra_hosts: ["host.docker.internal:host-gateway"]
+  grafana:
+    image: grafana/grafana            # VERIFY tag
+    ports: ["3000:3000"]
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+# Grafana at http://localhost:3000 (admin/admin) -> add Prometheus datasource
+# http://prometheus:9090 -> build panels for triton latency / DCGM GPU util.
