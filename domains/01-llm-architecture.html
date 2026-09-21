@@ -4,6 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NCP-GENL Domain 1 — LLM Architecture</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-okaidia.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+            onload="renderMathInElement(document.body, {
+              delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '$', right: '$', display: false}
+              ],
+              throwOnError: false,
+              strict: 'ignore'
+            });"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+
     <style>
 
         body {
@@ -34,10 +53,7 @@
             background-color: #fff;
             page-break-inside: avoid;
         }
-        .verse-title {
-            font-size: 1.05em;
-            margin-bottom: 6px;
-        }
+        .verse-title { font-size: 1.05em; margin-bottom: 6px; }
         .meta {
             text-align: left;
             color: #777;
@@ -45,29 +61,42 @@
             margin: 0 0 10px 0;
             font-size: 0.9em;
         }
-        .body {
-            font-size: 0.95em;
-            line-height: 1.55;
-        }
+        .body { font-size: 0.95em; line-height: 1.55; }
         .body p { margin: 0.55em 0; }
-        .body code {
+        .body code:not([class*="language-"]) {
             background: #f4f4f5;
             padding: 1px 5px;
             border-radius: 4px;
             font-size: 0.92em;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
         .body pre {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 10px 12px;
+            background: #272822;
+            border: 1px solid #1e1f1c;
+            border-radius: 8px;
+            padding: 12px 14px;
             overflow-x: auto;
             font-size: 0.88em;
-            line-height: 1.4;
+            line-height: 1.45;
+            margin: 0.75em 0;
         }
         .body pre code {
             background: none;
             padding: 0;
+            font-size: inherit;
+            color: inherit;
+        }
+        /* KaTeX display equations */
+        .body .katex-display {
+            margin: 0.85em 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 4px 0;
+        }
+        .math-block {
+            text-align: center;
+            margin: 0.85em 0;
+            overflow-x: auto;
         }
         .chain {
             background-color: #f9f9f9;
@@ -91,6 +120,7 @@
             body { max-width: 100%; padding: 0; }
             .verse-box { border: 1px solid #ccc; }
             .nav { display: none; }
+            .body pre { background: #f8f8f8; border-color: #ddd; color: #111; }
         }
 
     </style>
@@ -133,7 +163,7 @@ def block(x, attn, ffn, ln1, ln2):
         <div class="meta">Objective 1.2</div>
         <div class="body">
 <p>Attention mixes tokens by content similarity:</p>
-<p>$$\text{Attention}(Q,K,V)=\text{softmax}!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V$$</p>
+<p><div class="math-block">$$\text{Attention}(Q,K,V)=\text{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V$$</div></p>
 <p>with <code>Q=XW_Q</code>, <code>K=XW_K</code>, <code>V=XW_V</code>. The <code>1/√d_k</code> scale exists because for<br />
 unit-variance <code>q,k</code> the dot product <code>q·k</code> has variance <code>d_k</code>; <strong>without scaling</strong>,<br />
 logits grow with <code>d_k</code>, softmax saturates toward one-hot, and gradients through it<br />
@@ -155,8 +185,8 @@ def attention(Q, K, V, mask=None):           # Q,K,V: [B, h, T, d_k]
         <div class="body">
 <p>Split into <code>h</code> heads of width <code>d_k = d_model/h</code>, attend independently, concatenate,<br />
 project with <code>W_O</code>:</p>
-<p>$$\text{MHA}(X)=\text{Concat}(\text{head}_1,\dots,\text{head}_h)W_O,\quad<br />
-\text{head}_i=\text{Attention}(XW_Q^i,XW_K^i,XW_V^i)$$</p>
+<p><div class="math-block">$$\text{MHA}(X)=\text{Concat}(\text{head}_1,\dots,\text{head}_h)W_O,\quad
+\text{head}_i=\text{Attention}(XW_Q^i,XW_K^i,XW_V^i)$$</div></p>
 <p>Total parameter/FLOP cost ≈ one full-width head, but heads <strong>specialize</strong> (syntax,<br />
 coreference, positional patterns). GQA/MQA later share K,V across heads to shrink the<br />
 KV cache (see 4.26).</p>

@@ -4,6 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NCP-GENL Domain 6 — Evaluation</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-okaidia.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+            onload="renderMathInElement(document.body, {
+              delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '$', right: '$', display: false}
+              ],
+              throwOnError: false,
+              strict: 'ignore'
+            });"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+
     <style>
 
         body {
@@ -34,10 +53,7 @@
             background-color: #fff;
             page-break-inside: avoid;
         }
-        .verse-title {
-            font-size: 1.05em;
-            margin-bottom: 6px;
-        }
+        .verse-title { font-size: 1.05em; margin-bottom: 6px; }
         .meta {
             text-align: left;
             color: #777;
@@ -45,29 +61,42 @@
             margin: 0 0 10px 0;
             font-size: 0.9em;
         }
-        .body {
-            font-size: 0.95em;
-            line-height: 1.55;
-        }
+        .body { font-size: 0.95em; line-height: 1.55; }
         .body p { margin: 0.55em 0; }
-        .body code {
+        .body code:not([class*="language-"]) {
             background: #f4f4f5;
             padding: 1px 5px;
             border-radius: 4px;
             font-size: 0.92em;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
         .body pre {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 10px 12px;
+            background: #272822;
+            border: 1px solid #1e1f1c;
+            border-radius: 8px;
+            padding: 12px 14px;
             overflow-x: auto;
             font-size: 0.88em;
-            line-height: 1.4;
+            line-height: 1.45;
+            margin: 0.75em 0;
         }
         .body pre code {
             background: none;
             padding: 0;
+            font-size: inherit;
+            color: inherit;
+        }
+        /* KaTeX display equations */
+        .body .katex-display {
+            margin: 0.85em 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 4px 0;
+        }
+        .math-block {
+            text-align: center;
+            margin: 0.85em 0;
+            overflow-x: auto;
         }
         .chain {
             background-color: #f9f9f9;
@@ -91,6 +120,7 @@
             body { max-width: 100%; padding: 0; }
             .verse-box { border: 1px solid #ccc; }
             .nav { display: none; }
+            .body pre { background: #f8f8f8; border-color: #ddd; color: #111; }
         }
 
     </style>
@@ -113,7 +143,7 @@
         <div class="body">
 <p>Perplexity is the exponentiated average negative log-likelihood — the model's<br />
 "branching factor," how surprised it is per token:</p>
-<p>$$\text{PPL}=\exp!\left(-\frac{1}{N}\sum_{i=1}^{N}\log p(x_i\mid x_{&lt;i})\right)=\exp(\text{mean NLL})$$</p>
+<p><div class="math-block">$$\text{PPL}=\exp\!\left(-\frac{1}{N}\sum_{i=1}^{N}\log p(x_i\mid x_{&lt;i})\right)=\exp(\text{mean NLL})$$</div></p>
 <p>Lower = better. It is a <strong>fluency/likelihood</strong> measure computed on held-out text, <strong>not</strong><br />
 a task-quality measure (a fluent model can still be wrong). Only comparable across models<br />
 with the <strong>same tokenizer/vocabulary</strong> (tokenization changes N). Fixed-length models use<br />
@@ -132,8 +162,8 @@ ppl = torch.exp(torch.stack(nll_per_token).mean())
 <p>BLEU is <strong>precision-oriented</strong>: what fraction of the candidate's n-grams appear in the<br />
 reference (with clipping to avoid repetition gaming), geometric mean over n=1..4, times<br />
 a <strong>brevity penalty</strong> that punishes too-short output:</p>
-<p>$$\text{BLEU}=BP\cdot\exp!\Big(\sum_{n=1}^{4}w_n\log p_n\Big),\quad<br />
-BP=\begin{cases}1 &amp; c&gt;r\ e^{(1-r/c)} &amp; c\le r\end{cases}$$</p>
+<p><div class="math-block">$$\text{BLEU}=BP\cdot\exp\!\Big(\sum_{n=1}^{4}w_n\log p_n\Big),\quad
+BP=\begin{cases}1 &amp; c&gt;r\\ e^{(1-r/c)} &amp; c\le r\end{cases}$$</div></p>
 <p><code>c</code>=candidate length, <code>r</code>=reference length. No BP → a one-word correct token would score<br />
 perfectly. Standard for <strong>machine translation</strong>; corpus-level.</p>
         </div>
@@ -148,8 +178,8 @@ perfectly. Standard for <strong>machine translation</strong>; corpus-level.</p>
 - <strong>ROUGE-N</strong>: n-gram recall (ROUGE-1 unigrams, ROUGE-2 bigrams).<br />
 - <strong>ROUGE-L</strong>: based on the <strong>Longest Common Subsequence</strong> (order-aware, gaps allowed),<br />
   combined into an F-measure:</p>
-<p>$$R=\frac{LCS(c,r)}{|r|},\quad P=\frac{LCS(c,r)}{|c|},\quad<br />
-F_{L}=\frac{(1+\beta^2)RP}{R+\beta^2 P}$$</p>
+<p><div class="math-block">$$R=\frac{LCS(c,r)}{|r|},\quad P=\frac{LCS(c,r)}{|c|},\quad
+F_{L}=\frac{(1+\beta^2)RP}{R+\beta^2 P}$$</div></p>
 <p>Standard for <strong>summarization</strong>. LCS needs no fixed n and rewards in-order coverage.</p>
         </div>
 <div class="chain"><strong>Chain →</strong> BLEU/ROUGE only credit exact surface matches — how do we credit synonyms and stems? (6.04)</div>

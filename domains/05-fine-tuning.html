@@ -4,6 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NCP-GENL Domain 5 — Fine-Tuning</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-okaidia.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+            onload="renderMathInElement(document.body, {
+              delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '$', right: '$', display: false}
+              ],
+              throwOnError: false,
+              strict: 'ignore'
+            });"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+
     <style>
 
         body {
@@ -34,10 +53,7 @@
             background-color: #fff;
             page-break-inside: avoid;
         }
-        .verse-title {
-            font-size: 1.05em;
-            margin-bottom: 6px;
-        }
+        .verse-title { font-size: 1.05em; margin-bottom: 6px; }
         .meta {
             text-align: left;
             color: #777;
@@ -45,29 +61,42 @@
             margin: 0 0 10px 0;
             font-size: 0.9em;
         }
-        .body {
-            font-size: 0.95em;
-            line-height: 1.55;
-        }
+        .body { font-size: 0.95em; line-height: 1.55; }
         .body p { margin: 0.55em 0; }
-        .body code {
+        .body code:not([class*="language-"]) {
             background: #f4f4f5;
             padding: 1px 5px;
             border-radius: 4px;
             font-size: 0.92em;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
         .body pre {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 10px 12px;
+            background: #272822;
+            border: 1px solid #1e1f1c;
+            border-radius: 8px;
+            padding: 12px 14px;
             overflow-x: auto;
             font-size: 0.88em;
-            line-height: 1.4;
+            line-height: 1.45;
+            margin: 0.75em 0;
         }
         .body pre code {
             background: none;
             padding: 0;
+            font-size: inherit;
+            color: inherit;
+        }
+        /* KaTeX display equations */
+        .body .katex-display {
+            margin: 0.85em 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 4px 0;
+        }
+        .math-block {
+            text-align: center;
+            margin: 0.85em 0;
+            overflow-x: auto;
         }
         .chain {
             background-color: #f9f9f9;
@@ -91,6 +120,7 @@
             body { max-width: 100%; padding: 0; }
             .verse-box { border: 1px solid #ccc; }
             .nav { display: none; }
+            .body pre { background: #f8f8f8; border-color: #ddd; color: #111; }
         }
 
     </style>
@@ -153,7 +183,7 @@ models in memory (policy, reference, reward, value), unstable, expensive.</p>
         <div class="body">
 <p>A reward model (RM) scores a response's quality. Trained on human <strong>preference pairs</strong><br />
 (prompt, chosen, rejected) with the Bradley-Terry loss:</p>
-<p>$$\mathcal{L}<em>{RM}=-\log\sigma\big(r</em>\theta(x,y_{chosen})-r_\theta(x,y_{rejected})\big)$$</p>
+<p><div class="math-block">$$\mathcal{L}_{RM}=-\log\sigma\big(r_\theta(x,y_{chosen})-r_\theta(x,y_{rejected})\big)$$</div></p>
 <p>The RM is usually the SFT model with a scalar head. It provides the reward signal PPO<br />
 optimizes. Quality/coverage of preference data caps final alignment quality.</p>
         </div>
@@ -168,7 +198,7 @@ optimizes. Quality/coverage of preference data caps final alignment quality.</p>
 the <strong>reward model</strong> scores, a <strong>value</strong> network estimates baselines, and a clipped<br />
 surrogate objective bounds each update. A <strong>KL penalty</strong> to the frozen SFT reference<br />
 keeps the policy from drifting into reward-hacking gibberish:</p>
-<p>$$\text{reward} = r_\theta(x,y) - \beta\,\text{KL}\big(\pi_\theta \,|\, \pi_{ref}\big)$$</p>
+<p><div class="math-block">$$\text{reward} = r_\theta(x,y) - \beta\,\text{KL}\big(\pi_\theta \,\|\, \pi_{ref}\big)$$</div></p>
 <p>Sensitive to hyperparameters; the value net doubles memory. This complexity motivates<br />
 DPO.</p>
         </div>
@@ -182,7 +212,7 @@ DPO.</p>
 <p>DPO skips the explicit reward model and RL loop: it reparameterizes the RLHF objective<br />
 so the optimal policy defines an <strong>implicit reward</strong>, giving a simple classification<br />
 loss on preference pairs against a frozen reference:</p>
-<p>$$\mathcal{L}<em>{DPO}=-\log\sigma!\Big(\beta\log\frac{\pi</em>\theta(y_w|x)}{\pi_{ref}(y_w|x)}-\beta\log\frac{\pi_\theta(y_l|x)}{\pi_{ref}(y_l|x)}\Big)$$</p>
+<p><div class="math-block">$$\mathcal{L}_{DPO}=-\log\sigma\!\Big(\beta\log\frac{\pi_\theta(y_w|x)}{\pi_{ref}(y_w|x)}-\beta\log\frac{\pi_\theta(y_l|x)}{\pi_{ref}(y_l|x)}\Big)$$</div></p>
 <p>(<code>y_w</code>=chosen, <code>y_l</code>=rejected). Only policy + reference in memory; stable, no reward<br />
 model, no sampling loop. The <code>β</code> controls deviation from the reference.</p>
         </div>
@@ -215,7 +245,7 @@ into pairs.</p>
 for each prompt it samples a <strong>group</strong> of <code>G</code> responses, scores them (often with a<br />
 verifiable/rule-based reward), and uses the <strong>group mean/std as the baseline</strong> so the<br />
 advantage is each response's reward normalized within its group:</p>
-<p>$$A_i=\frac{r_i-\text{mean}(r_{1..G})}{\text{std}(r_{1..G})}$$</p>
+<p><div class="math-block">$$A_i=\frac{r_i-\text{mean}(r_{1..G})}{\text{std}(r_{1..G})}$$</div></p>
 <p>Cheaper than PPO (no value net), well-suited to reasoning tasks with automatic reward<br />
 checking.</p>
         </div>
@@ -270,7 +300,7 @@ checking.</p>
         <div class="meta">Objective 5.2</div>
         <div class="body">
 <p>LoRA freezes pretrained <code>W₀ ∈ ℝ^{d×k}</code> and learns a <strong>low-rank update</strong>:</p>
-<p>$$W = W_0 + \Delta W = W_0 + \frac{\alpha}{r} BA,\qquad B\in\mathbb{R}^{d\times r},\; A\in\mathbb{R}^{r\times k},\; r\ll\min(d,k)$$</p>
+<p><div class="math-block">$$W = W_0 + \Delta W = W_0 + \frac{\alpha}{r} BA,\qquad B\in\mathbb{R}^{d\times r},\; A\in\mathbb{R}^{r\times k},\; r\ll\min(d,k)$$</div></p>
 <p>Only <code>A, B</code> train (parameters ∝ <code>r(d+k)</code> instead of <code>d·k</code>). <code>A</code> init random Gaussian,<br />
 <code>B</code> init zero (so ΔW starts at 0). At inference <code>BA</code> can be <strong>merged</strong> into <code>W₀</code> → zero<br />
 added latency.</p>
@@ -430,7 +460,7 @@ many tasks. Adapters mostly legacy.</p>
   negative by a margin.<br />
 - <strong>InfoNCE / contrastive</strong>: treat the matching pair as positive against in-batch<br />
   negatives:</p>
-<p>$$\mathcal{L}=-\log\frac{\exp(\text{sim}(a,p)/\tau)}{\sum_i \exp(\text{sim}(a,n_i)/\tau)}$$</p>
+<p><div class="math-block">$$\mathcal{L}=-\log\frac{\exp(\text{sim}(a,p)/\tau)}{\sum_i \exp(\text{sim}(a,n_i)/\tau)}$$</div></p>
 <p>Temperature <code>τ</code> sharpens; large in-batch negatives help. Basis of retrieval/RAG<br />
 embedding quality (2.24, 6.08).</p>
         </div>
