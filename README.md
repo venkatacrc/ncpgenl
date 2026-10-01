@@ -1,6 +1,10 @@
-# NCP-GENL
+# NCP-GENL Pages
 
-Password-protected study site: https://venkatacrc.github.io/ncpgenl/
+Password-protected study sites:
 
-The published files are client-side encrypted. Enter the shared password in the
-browser to unlock GenL Cards and the verse pages.
+- **GenL Cards** (root): https://venkatacrc.github.io/ncpgenl/
+- **HSTU Cards** (`hstu/`): https://venkatacrc.github.io/ncpgenl/hstu/
+
+Published files are client-side encrypted (Instant-Lock / IAGP). Enter the shared
+course password in the browser to unlock. Sources live in the private repos
+`ncp_genl` and `hstuapp`; this repo only holds the encrypted GitHub Pages builds.
