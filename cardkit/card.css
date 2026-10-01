@@ -1,0 +1,144 @@
+:root {
+    --gl-accent: #4e8a00;
+    --gl-accent-soft: rgba(118, 185, 0, 0.14);
+    --gl-ink: #1d1d1f;
+    --gl-muted: #6e6e73;
+    --gl-faint: #a1a1a6;
+    --gl-card: #ffffff;
+    --gl-border: rgba(0, 0, 0, 0.12);
+    --gl-code-inline: #f2f2f4;
+    --gl-cue: #f6f8f1;
+    --gl-good: #1f9d55;
+    --gl-bad: #d9480f;
+    --gl-review: #e67700;
+    color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --gl-accent: #8fd11a;
+        --gl-accent-soft: rgba(118, 185, 0, 0.18);
+        --gl-ink: #f2f2f7;
+        --gl-muted: #a1a1a6;
+        --gl-faint: #6e6e73;
+        --gl-card: #1f1f22;
+        --gl-border: rgba(255, 255, 255, 0.14);
+        --gl-code-inline: #2c2c30;
+        --gl-cue: #24281d;
+    }
+}
+
+.gl-card {
+    box-sizing: border-box;
+    background: var(--gl-card);
+    color: var(--gl-ink);
+    border: 1px solid var(--gl-border);
+    border-radius: 18px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.10);
+    padding: 26px 32px 30px;
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    cursor: default;
+}
+.gl-card.flipped { border-color: color-mix(in srgb, var(--gl-accent) 55%, transparent); }
+
+.gl-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; min-height: 22px; }
+.gl-label { font-weight: 600; color: var(--gl-muted); margin-right: auto; }
+.gl-chip {
+    font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+    background: var(--gl-accent-soft); color: var(--gl-accent);
+}
+.gl-meta { font-weight: 400; color: var(--gl-faint); margin-left: 8px; }
+.gl-chip.kind-lesson { background: rgba(0, 122, 255, 0.13); color: #0a6cdc; }
+.gl-chip.kind-question { background: rgba(88, 86, 214, 0.13); color: #5856d6; }
+.gl-chip.kind-trap { background: rgba(217, 72, 15, 0.13); color: var(--gl-bad); }
+.gl-chip.kind-reading { background: rgba(142, 142, 147, 0.18); color: var(--gl-muted); }
+.gl-chip.known { background: rgba(31, 157, 85, 0.16); color: var(--gl-good); }
+.gl-chip.review { background: rgba(230, 119, 0, 0.16); color: var(--gl-review); }
+.gl-chip.box { background: rgba(88, 86, 214, 0.14); color: #5856d6; }
+.gl-chip.note { background: rgba(175, 82, 222, 0.14); color: #af52de; }
+
+.gl-cue {
+    background: var(--gl-cue); border-left: 3px solid var(--gl-accent);
+    padding: 8px 12px; border-radius: 6px; margin-bottom: 14px;
+    font-size: 15px; color: var(--gl-muted);
+}
+.gl-cue p { margin: 0; }
+
+.gl-front { font-size: 22px; line-height: 1.4; font-weight: 600; text-align: center; margin: 10px 0 6px; }
+.kind-verse .gl-front, .kind-reading .gl-front, .kind-lesson .gl-front { font-size: 24px; }
+.kind-question .gl-front { text-align: left; font-size: 19px; font-weight: 500; }
+.gl-front p { margin: 0.35em 0; }
+.gl-front .gl-sub { display: block; font-size: 15px; font-weight: 400; color: var(--gl-muted); margin-top: 6px; }
+
+.gl-hint { text-align: center; color: var(--gl-muted); font-size: 14px; margin-top: 26px; }
+.gl-rule { border: 0; border-top: 1px solid var(--gl-border); margin: 20px 40px; }
+
+.gl-block { margin: 14px 0; }
+.gl-block h3 {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--gl-accent); margin: 0 0 4px;
+}
+.gl-block.chain .gl-md { border-left: 3px solid var(--gl-good); padding-left: 10px; }
+.gl-block.note .gl-md { color: #af52de; }
+.gl-block.muted .gl-md { color: var(--gl-muted); font-size: 15px; }
+
+.gl-md p { margin: 0.45em 0; }
+.gl-md ul, .gl-md ol { margin: 0.4em 0; padding-left: 1.4em; }
+.gl-md li { margin: 0.15em 0; }
+.gl-md code:not([class*='language-']) {
+    background: var(--gl-code-inline); padding: 1px 5px; border-radius: 4px;
+    font: 0.9em ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.gl-md pre[class*='language-'], .gl-md pre {
+    border-radius: 8px; padding: 12px 14px; margin: 0.7em 0; overflow-x: auto;
+    font-size: 13.5px; line-height: 1.45; text-align: left; background: #272822;
+}
+.gl-md pre code { font: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.gl-md table { border-collapse: collapse; margin: 0.6em 0; font-size: 14px; width: 100%; }
+.gl-md th, .gl-md td { border: 1px solid var(--gl-border); padding: 5px 8px; text-align: left; vertical-align: top; }
+.gl-md th { background: var(--gl-accent-soft); }
+.gl-md blockquote { margin: 0.6em 0; padding: 4px 12px; border-left: 3px solid var(--gl-faint); color: var(--gl-muted); }
+.gl-md .katex-display { margin: 0.7em 0; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+.gl-md a { color: var(--gl-accent); }
+
+.gl-options { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 8px; }
+.gl-option {
+    display: flex; gap: 12px; align-items: flex-start;
+    border: 1px solid var(--gl-border); border-radius: 10px; padding: 9px 12px;
+    cursor: pointer; transition: background 0.12s, border-color 0.12s;
+}
+.gl-option:hover { background: var(--gl-accent-soft); }
+.flipped .gl-option { cursor: default; }
+.flipped .gl-option:hover { background: none; }
+.gl-option .gl-md p { margin: 0; }
+.gl-key {
+    flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 700; font-size: 13px; background: var(--gl-code-inline); color: var(--gl-muted);
+}
+.gl-option.chosen { border-color: var(--gl-accent); }
+.gl-option.correct { border-color: var(--gl-good); background: rgba(31, 157, 85, 0.10); }
+.gl-option.correct .gl-key { background: var(--gl-good); color: #fff; }
+.gl-option.wrong { border-color: var(--gl-bad); background: rgba(217, 72, 15, 0.08); }
+.gl-option.wrong .gl-key { background: var(--gl-bad); color: #fff; }
+
+.gl-verdict { font-weight: 700; font-size: 16px; margin: 6px 0 4px; }
+.gl-verdict.good { color: var(--gl-good); }
+.gl-verdict.bad { color: var(--gl-bad); }
+.gl-linkrow { margin: 14px 0 0; font-weight: 600; }
+.gl-linkrow a { color: var(--gl-accent); text-decoration: none; }
+
+/* ---- Print ---- */
+.gl-print { color: #111; font: 11pt/1.45 -apple-system, 'Helvetica Neue', Arial, sans-serif; }
+.gl-print h1 { font-size: 20pt; margin: 0 0 2pt; text-align: center; }
+.gl-print-count { text-align: center; color: #555; font-size: 9.5pt; margin-bottom: 12pt; }
+.gl-print h2 { font-size: 13pt; color: #3d6b00; margin: 16pt 0 4pt; border-bottom: 1px solid #cfd8c0; padding-bottom: 2pt; }
+.gl-print-card { break-inside: avoid; page-break-inside: avoid; border: 1px solid #ddd; border-radius: 8px; padding: 8pt 10pt; margin: 8pt 0; }
+.gl-print-label { font-weight: 700; font-size: 9pt; color: #666; margin-bottom: 2pt; }
+.gl-print .gl-front { font-size: 12pt; text-align: left; font-weight: 600; margin: 2pt 0; }
+.gl-print .gl-cue { background: #f4f6ef; color: #444; font-size: 10pt; margin-bottom: 4pt; }
+.gl-print .gl-block { margin: 5pt 0; }
+.gl-print .gl-block h3 { color: #3d6b00; font-size: 8pt; }
+.gl-print .gl-options { margin-top: 4pt; gap: 3pt; }
+.gl-print .gl-option { padding: 3pt 6pt; border-radius: 6px; }
+.gl-print .gl-md pre { font-size: 8.5pt; white-space: pre-wrap; }
+.gl-print .gl-linkrow { font-size: 9pt; font-weight: 400; color: #3d6b00; word-break: break-all; }

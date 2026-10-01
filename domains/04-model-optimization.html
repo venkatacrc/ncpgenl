@@ -133,7 +133,7 @@
         Quantization (INT8/FP8/NVFP4), PTQ/QAT, GPTQ/AWQ, sparsity, distillation, TensorRT-LLM.
     </div>
     <div class="nav">
-        <a href="../index.html">← All domains</a>
+        <a href="../verses.html">← All domains</a>
         <a href="05-fine-tuning.html">Next domain →</a>
     </div>
     <h2>The 34 Verses</h2>
@@ -580,8 +580,8 @@ instead — same fused-attention concept, no FP8 path. Build with <code>--dtype 
 <p>Per-token KV cache size (bytes):</p>
 <p><div class="math-block">$$\text{KV} = 2 \times n_{\text{layers}} \times n_{\text{kv\_heads}} \times d_{\text{head}} \times \text{bytes}$$</div></p>
 <p>The leading <strong>2</strong> = keys + values. Total = <code>× seq_len × batch</code>. Example: 32 layers,<br />
-32 KV heads, head_dim 128, FP16 (2 bytes) → per token = 2·32·32·128·2 ≈ <strong>1.05 MB</strong>;<br />
-at 4096 tokens ≈ 4.3 GB <strong>per sequence</strong>. This is why long context/large batch is<br />
+32 KV heads, head_dim 128, FP16 (2 bytes) → per token = 2·32·32·128·2 = 524,288 B ≈ <strong>0.5 MiB</strong>;<br />
+at 4096 tokens = <strong>2 GiB per sequence</strong>. This is why long context/large batch is<br />
 memory-bound and why <strong>GQA/MQA</strong> (fewer <code>n_kv_heads</code>) and KV quantization (4.16) matter.</p>
 <pre><code class="language-python">kv_bytes = 2 * n_layers * n_kv_heads * head_dim * bytes_per_elt  # per token
 total = kv_bytes * seq_len * batch
@@ -716,7 +716,7 @@ batch = per-device × devices × grad-accum steps (7.15).</p>
 
     <div class="nav">
         <a href="03-data-preparation.html">← Previous domain</a>
-        <a href="../index.html">All domains</a>
+        <a href="../verses.html">All domains</a>
         <a href="05-fine-tuning.html">Next domain →</a>
     </div>
 </body>

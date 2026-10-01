@@ -1,0 +1,17 @@
+{
+    "name": "GenL Cards",
+    "short_name": "GenL Cards",
+    "description": "Flash cards, lessons, practice questions and readings for the NVIDIA NCP-GENL (Generative AI LLMs) certification.",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#f3f6ee",
+    "theme_color": "#4e8a00",
+    "categories": ["education"],
+    "icons": [
+        { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    ]
+}
